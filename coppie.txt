@@ -51,3 +51,7 @@ https://teams.microsoft.com/l/meetup-join/19%3ameeting_YTgzNDhkZGEtYjE0My00NjUwL
 STANZA10
 
 https://teams.microsoft.com/l/meetup-join/19%3ameeting_M2RjMmY3ZDEtMzkxYS00MDI3LWIzNTktZWZlNzc5M2NmMjc3%40thread.v2/0?context=%7b%22Tid%22%3a%22e99647dc-1b08-454a-bf8c-699181b389ab%22%2c%22Oid%22%3a%22c9ec7f1a-847c-4304-ade6-35ed6356ac4a%22%7d
+
+STANZA1
+
+https://teams.microsoft.com/l/meetup-join/19%3ameeting_Mzk5YjE5ZTMtNTUwMy00MTBiLWI0OTQtMDQ2YjAzZjhiZWE0%40thread.v2/0?context=%7b%22Tid%22%3a%22e99647dc-1b08-454a-bf8c-699181b389ab%22%2c%22Oid%22%3a%22c9ec7f1a-847c-4304-ade6-35ed6356ac4a%22%7d
