@@ -1,0 +1,977 @@
+#pragma once
+
+#include "TFile.h"
+#include "TH1.h"
+#include "sbnana/CAFAna/Core/Binning.h"
+#include "sbnana/CAFAna/Core/Spectrum.h"
+#include "sbnana/CAFAna/Core/SpectrumLoader.h"
+// NuMINumuXSec
+//#include "ICARUSCRTPMTMatching.h"
+#include "helper_numuCCSelCuts.h"
+
+#include "TCanvas.h"
+#include "TVector3.h"
+#include "TLegend.h"
+#include "TPaveText.h"
+#include "TStyle.h"
+#include "iostream"
+#include "fstream"
+
+using namespace ana;
+
+////////////////////////////////////
+//            VARS               //
+///////////////////////////////////
+
+////////////////////////////////////
+//             Cuts              //
+///////////////////////////////////
+
+const SpillCut OpFlash_cut([](const caf::SRSpillProxy* sr){
+    for (const auto& opflash : sr->opflashes){
+      auto thistime =  opflash.firsttime;
+      if (thistime > -0.1 && thistime < 9.7) {
+	return true;
+      } 
+    }
+    return false;
+  }
+  );
+
+const SpillCut OpFlash_MC([](const caf::SRSpillProxy* sr){
+    for (const auto& opflash : sr->opflashes){
+      auto thistime =  opflash.firsttime -  sr->hdr.triggerinfo.trigger_within_gate;
+      if (thistime > -0.1 && thistime < 9.7) {
+	return true;
+      } 
+    }
+    return false;
+  }
+  );
+
+const Cut kSlcTrkDiry([](const caf::SRSliceProxy* slc) -> double {
+    if (slc->nuid.crlongtrkdiry > -0.2) {
+      return true;
+    } else {
+      return false;
+    }
+  });
+
+const Cut kContained([](const caf::SRSliceProxy* slc) -> double {
+    if (slc->nuid.crlongtrkdiry > -0.2 && kmuon_contained(slc)) {
+      return true;
+    } else {
+      return false;
+    }
+  });
+
+const Cut kHasMunNu([](const caf::SRSliceProxy* slc) -> double {
+    if (kHasNu(slc) && kmuon_contained(slc)) {
+      return true;
+    } else {
+      return false;
+    }
+  });
+
+const Cut kSlcTrkDiryTkl([](const caf::SRSliceProxy* slc) -> double {
+    if (slc->nuid.crlongtrkdiry > -0.2 && kLongestTrackLength(slc) > 15) {
+      return true;
+    } else {
+      return false;
+    }
+  });
+
+const Cut kDiryNuTkl([](const caf::SRSliceProxy* slc) -> double {
+    if (slc->nuid.crlongtrkdiry > -0.2 && kHasNu(slc) && kLongestTrackLength(slc) > 100) {
+      return true;
+    } else {
+      return false;
+    }
+  });
+
+const Cut kDiryNoNuTkl([](const caf::SRSliceProxy* slc) -> double {
+    if (slc->nuid.crlongtrkdiry > -0.2 && !kHasNu(slc) && kLongestTrackLength(slc) > 100) {
+      return true;
+    } else {
+      return false;
+    }
+  });
+
+const Cut kNuContained([](const caf::SRSliceProxy* slc) -> double {
+    if (slc->nuid.crlongtrkdiry > -0.2 && kHasNu(slc) && kLongestTrackLength(slc) > 100 && kmuon_contained(slc)) {
+      return true;
+    } else {
+      return false;
+    }
+  });
+
+const Cut kNoNuContained([](const caf::SRSliceProxy* slc) -> double {
+    if (slc->nuid.crlongtrkdiry > -0.2 && !kHasNu(slc) && kLongestTrackLength(slc) > 100 && kmuon_contained(slc)) {
+      return true;
+    } else {
+      return false;
+    }
+  });
+
+const Cut kDiryNu([](const caf::SRSliceProxy* slc) -> double {
+    if (slc->nuid.crlongtrkdiry > -0.2 && kHasNu(slc)) {
+      return true;
+    } else {
+      return false;
+    }
+  });
+
+const Cut kDiryNoNu([](const caf::SRSliceProxy* slc) -> double {
+    if (slc->nuid.crlongtrkdiry > -0.2 && !kHasNu(slc)) {
+      return true;
+    } else {
+      return false;
+    }
+  });
+
+const Cut kTkl([](const caf::SRSliceProxy* slc) -> double {
+    if (kLongestTrackLength(slc) > 100) {
+      return true;
+    } else {
+      return false;
+    }
+  });
+
+////////////////////////////////////
+//       MAIN EVENT LOOP          //
+///////////////////////////////////
+
+void sansCRTPMT(){
+
+  //cpmt.SetGateType(NUMI);
+
+  //  const std::string fnus = "/pnfs/icarus/persistent/users/jskim/data/run_8515/flatcaf/v09_63_00_02/221212_UseOldFlashMatching_FixCAFT1/NUMIMAJORITY/flatcaf_0.root"; //numi Beam ON Majority
+  //const std::string fcos = "/pnfs/icarus/persistent/users/jskim/data/run_8515/flatcaf/v09_63_00_02/221212_UseOldFlashMatching_FixCAFT1/OffBeamNUMIMAJORITY/flatcaf_0.root"; //numi Beam OFF Majority
+  //const std::string fcosmics_data = "/pnfs/icarus/scratch/users/aheggest/crt/mc/NuMI_intime_cosmics/v09_75_01/caf/NuMI_intime_cosmics_246files_merged.root"; //Cosmics
+  //const std::string foffbeam = "/pnfs/icarus/scratch/users/aheggest/crt/data/run_9726/offbeamNuMImajority/v09_75_01/caf/data_offbeamNuMI_crtpmt_Blind_193files_merged.OKTOLOOK.flat.caf.root"; //foffbeam
+  const std::string fMC_majority_old = "/pnfs/sbn/data/sbn_fd/poms_production/2023A_ICARUS_NuMI_MC_Nu_Phase1/pretuned_signal_shape/mc/reconstructed/icaruscode_v09_72_00_03/flatcaf/[0]*/[2,3,4]*/detsim*.flat.caf*.root"; // old MC sample //it was flatcaf/[0]*/[0,1,2,3,4,5,6,7,8,9]*/detsim* //FULL PATH//"/pnfs/sbn/data/sbn_fd/poms_production/2023A_ICARUS_NuMI_MC_Nu_Phase1/pretuned_signal_shape/mc/reconstructed/icaruscode_v09_72_00_03/flatcaf/*/*/detsim*.flat.caf*.root"
+  ///pnfs/sbn/data/sbn_fd/poms_production/2023A_ICARUS_NuMI_MC_Nu_Phase1/pretuned_signal_shape/mc/reconstructed/icaruscode_v09_72_00_03/
+  const std::string fdirt_mc_old = "/pnfs/sbn/data/sbn_fd/poms_production/2023A_ICARUS_NuMI_MC_dirt_plus_cosmics/pretuned_signal_shape/mc/reconstructed/icaruscode_v09_72_00_03/flatcaf/[0,1,2,3]*/[0,1,2,3,4,5,6,7,8,9]*/detsim*.flat.caf*.root"; //[0,1,2,3]*/[0,1,2,3,4,5,6,7,8,9]* //full path // /[0,1,2,3]*/[0,1,2,3,4,5,6,7,8,9]*/
+  const std::string fdata_majority_old = "/pnfs/icarus/scratch/users/gputnam/DMCP2023G/majority-3t1p/57386892_[2,3,4,5][0,1,3]*/data*Prescaled*.root";///57386892_[2,3,4,5][0,1,3]*/ //full path "/pnfs/icarus/scratch/users/gputnam/DMCP2023G/majority-3t1p/57386892_*/data*Prescaled*.root"
+  const std::string fdirt_mc = "/pnfs/icarus/scratch/users/aheggest/crt/mc/NuMI_dirt_plus_cosmics/v09_75_01/caf/out/detsim_crtpmt_109files_mergedflat.caf.root"; // dirt MC
+  const std::string fdata_majority = "/pnfs/icarus/scratch/users/aheggest/crt/data/run2/NuMImajority/v09_75_01/caf/data_NuMImajority_crtpmt_77files_merged_Blind.OKTOLOOK.flat.caf.root"; //beam on data
+  const std::string fMC_majority = "/pnfs/icarus/scratch/users/aheggest/crt/mc/NuMI_nu_plus_cosmics/v09_75_01/caf/out/2619881_*/detsim_2d_icarus_detsim_stage0_stage1*flat.caf.root";
+  //const std::string fMC_intimecosmic = "/pnfs/sbn/data/sbn_fd/poms_production/2023A_ICARUS_NuMI_MC_intime_cosmics/pretuned_signal_shape/mc/reconstructed/icaruscode_v09_72_00_03/flatcaf/[0]*/[0]*/detsim*.flat.caf*.root";
+
+  // Source of events
+  SpectrumLoader loader_nus(fdirt_mc);
+  //SpectrumLoader loader_intime(fMC_intimecosmic);
+  SpectrumLoader loader_maj(fMC_majority_old);
+  SpectrumLoader loader_cos(fdata_majority_old);
+
+
+  Spectrum scos_nus (loader_nus,     axcos,   kNoCut);
+  Spectrum scos_maj (loader_maj,     axcos,   kNoCut);
+  Spectrum scos_cos (loader_cos,     axcos,   kNoCut);
+  Spectrum scos_nus_Tkl (loader_nus,     axcos,         kTkl);
+  Spectrum scos_maj_Tkl (loader_maj,     axcos,         kTkl);
+  Spectrum scos_cos_Tkl (loader_cos,     axcos,         kTkl);
+  Spectrum scos_nus_OPF (loader_nus,     axcos,   OpFlash_MC,   kNoCut);
+  Spectrum scos_maj_OPF (loader_maj,     axcos,   OpFlash_MC,   kNoCut);
+  Spectrum scos_cos_OPF (loader_cos,     axcos,   OpFlash_cut,  kNoCut);
+  Spectrum scos_nus_diry (loader_nus,     axcos,   kNoSpillCut, kSlcTrkDiry);
+  Spectrum scos_maj_diry (loader_maj,     axcos,   kNoSpillCut, kSlcTrkDiry);
+  Spectrum scos_cos_diry (loader_cos,     axcos,   kNoSpillCut, kSlcTrkDiry);
+  Spectrum scos_nus_diryTkl (loader_nus,     axcos,   kNoSpillCut,      kSlcTrkDiryTkl);
+  Spectrum scos_maj_diryTkl (loader_maj,     axcos,   kNoSpillCut,      kSlcTrkDiryTkl);
+  Spectrum scos_cos_diryTkl (loader_cos,     axcos,   kNoSpillCut,      kSlcTrkDiryTkl);
+  Spectrum scos_nus_OPFdiry (loader_nus,     axcos,   kNoSpillCut,      kSlcTrkDiry);
+  Spectrum scos_maj_OPFdiry (loader_maj,     axcos,   kNoSpillCut,      kSlcTrkDiry);
+  Spectrum scos_cos_OPFdiry (loader_cos,     axcos,   OpFlash_cut,      kSlcTrkDiry);
+  //Spectrum scos_time_OPFdiry (loader_intime,     axcos,   kNoSpillCut,  kSlcTrkDiry);
+  Spectrum scos_nus_OPFdiryTkl (loader_nus,     axcos,   kNoSpillCut,   kSlcTrkDiryTkl);
+  Spectrum scos_maj_OPFdiryTkl (loader_maj,     axcos,   kNoSpillCut,   kSlcTrkDiryTkl);
+  Spectrum scos_cos_OPFdiryTkl (loader_cos,     axcos,   kNoSpillCut/*OpFlash_cut*/,    kSlcTrkDiryTkl);
+  Spectrum scos_nus_noncosmic (loader_nus,     axcos,   kNoSpillCut,    kDiryNu);
+  Spectrum scos_maj_noncosmic (loader_maj,     axcos,   kNoSpillCut,    kDiryNu);
+  Spectrum scos_nus_cosmic (loader_nus,     axcos,   kNoSpillCut,       kDiryNoNu);
+  Spectrum scos_maj_cosmic (loader_maj,     axcos,   kNoSpillCut,       kDiryNoNu);
+  Spectrum scos_nus_noncosmicTkl (loader_nus,     axcos,   kNoSpillCut, kDiryNuTkl);
+  Spectrum scos_maj_noncosmicTkl (loader_maj,     axcos,   kNoSpillCut, kDiryNuTkl);
+  Spectrum scos_nus_cosmicTkl (loader_nus,     axcos,   kNoSpillCut,    kDiryNoNuTkl);
+  Spectrum scos_maj_cosmicTkl (loader_maj,     axcos,   kNoSpillCut,    kDiryNoNuTkl);
+  Spectrum scos_maj_Nu (loader_maj,     axcos,   kNoSpillCut,   kHasMunNu);
+  Spectrum scos_nus_Nu (loader_nus,     axcos,   kNoSpillCut,   kHasMunNu);
+  Spectrum scos_maj_Contained (loader_maj,     axcos,   kNoSpillCut,    kContained);
+  Spectrum scos_maj_NuContained (loader_maj,     axcos,   kNoSpillCut,  kNuContained);
+  Spectrum scos_maj_NoNuContained (loader_maj,     axcos,   kNoSpillCut,        kNoNuContained);
+
+
+  Spectrum stkl_nus (loader_nus, axtkl, kNoSpillCut, kNoCut);
+  Spectrum stkl_maj (loader_maj, axtkl, kNoSpillCut, kNoCut);
+  Spectrum stkl_cos (loader_cos, axtkl, kNoSpillCut, kNoCut);
+  Spectrum stkl_nus_OPFdiry (loader_nus, axtkl, kNoSpillCut, kSlcTrkDiry);
+  Spectrum stkl_maj_OPFdiry (loader_maj, axtkl, kNoSpillCut, kSlcTrkDiry);
+  Spectrum stkl_cos_OPFdiry (loader_cos, axtkl, kNoSpillCut/*OpFlash_cut*/, kSlcTrkDiry);
+  Spectrum stkl_maj_noncosmic (loader_maj, axtkl, kNoSpillCut, kDiryNu);
+  Spectrum stkl_maj_cosmic (loader_maj, axtkl, kNoSpillCut, kDiryNoNu);
+  //Spectrum stkl_time_cosmic (loader_intime, axtkl, kNoSpillCut, kDiryNoNu);
+
+  Spectrum senergy_nus (loader_nus, axenergy, kNoSpillCut, kHasNu);
+  Spectrum senergy_maj (loader_maj, axenergy, kNoSpillCut, kHasNu);
+
+  Spectrum smom (loader_maj, axmom, axtkl, kNoSpillCut, kmuon_contained, kNoShift, kUnweighted);
+
+  Spectrum dedx_all  (loader_cos, axdedx, OpFlash_cut, kSlcTrkDiryTkl);
+  Spectrum dedx_allMC (loader_maj, axdedx, OpFlash_MC, kSlcTrkDiryTkl);
+  Spectrum dedx_allNoSpillCut  (loader_cos, axdedx, kNoSpillCut, kSlcTrkDiryTkl); //no spill cut
+  //loader, asse, spillcut, slicecut
+  Spectrum dedx_allMCNoSpillCut (loader_maj, axdedx, kSlcTrkDiryTkl);
+  Spectrum dedx_rockMC (loader_nus, axdedx, OpFlash_MC, kSlcTrkDiryTkl);
+
+  Spectrum *sOpFlashTimeCos = new Spectrum("OpFlashTime", kTimeBinning, loader_cos, spillvarOpFlashTime, kNoSpillCut);
+  Spectrum *sOpFlashTimeMaj = new Spectrum("OpFlashTime", kTimeBinning, loader_maj, spillvarOpFlashTime, kNoSpillCut);
+  Spectrum *sOpFlashTimeNus = new Spectrum("OpFlashTime", kTimeBinning, loader_nus, spillvarOpFlashTime, kNoSpillCut);
+  Spectrum *sOpFlashTimeCosCUT = new Spectrum("OpFlashTime", kTimeBinning, loader_cos, spillvarOpFlashTime, OpFlash_cut);
+  Spectrum *sOpFlashTimeMajCUT = new Spectrum("OpFlashTime", kTimeBinning, loader_maj, spillvarOpFlashTime, OpFlash_cut);
+  Spectrum *sOpFlashTimeNusCUT = new Spectrum("OpFlashTime", kTimeBinning, loader_nus, spillvarOpFlashTime, OpFlash_cut);
+  
+  //Da fixare //sOpFlashTime[Nus,Maj,Cos]+eventually CUT
+
+
+  double POT = scos_cos.POT(); //2.7E12;//6.0E20; //NuMI
+
+  loader_nus.Go();
+  loader_maj.Go();
+  loader_cos.Go();
+  //loader_intime.Go();
+
+  // scos_nus.OverridePOT(1);
+  // scos_maj.OverridePOT(1);
+  // scos_cos.OverridePOT(1);
+  // scos_nus_OPF.OverridePOT(1);
+  // scos_maj_OPF.OverridePOT(1);
+  // scos_cos_OPF.OverridePOT(1);
+  // scos_nus_Tkl.OverridePOT(1);
+  // scos_maj_Tkl.OverridePOT(1);
+  // scos_cos_Tkl.OverridePOT(1);
+  // scos_nus_diry.OverridePOT(1);
+  // scos_maj_diry.OverridePOT(1);
+  // scos_cos_diry.OverridePOT(1);
+  // scos_nus_diryTkl.OverridePOT(1);
+  // scos_maj_diryTkl.OverridePOT(1);
+  // scos_cos_diryTkl.OverridePOT(1);
+  // scos_nus_OPFdiry.OverridePOT(1);
+  // scos_maj_OPFdiry.OverridePOT(1);
+  // scos_cos_OPFdiry.OverridePOT(1);
+  // scos_nus_OPFdiryTkl.OverridePOT(1);
+  // scos_maj_OPFdiryTkl.OverridePOT(1);
+  // scos_cos_OPFdiryTkl.OverridePOT(1);
+  // scos_nus_noncosmic.OverridePOT(1);
+  // scos_maj_noncosmic.OverridePOT(1);
+  // scos_nus_cosmic.OverridePOT(1);
+  // scos_maj_cosmic.OverridePOT(1);
+  // scos_nus_noncosmicTkl.OverridePOT(1);
+  // scos_maj_noncosmicTkl.OverridePOT(1);
+  // scos_nus_cosmicTkl.OverridePOT(1);
+  // scos_maj_cosmicTkl.OverridePOT(1);
+  // scos_nus_Nu.OverridePOT(1);
+  // scos_maj_Nu.OverridePOT(1);
+
+  // stkl_nus.OverridePOT(1);
+  // stkl_maj.OverridePOT(1);
+  // stkl_cos.OverridePOT(1);
+  // stkl_nus_OPFdiry.OverridePOT(1);
+  // stkl_maj_OPFdiry.OverridePOT(1);
+  // stkl_cos_OPFdiry.OverridePOT(1);
+
+  // senergy_nus.OverridePOT(1);
+  // senergy_maj.OverridePOT(1);
+
+
+  TH1D* hcos_cos = scos_cos.ToTH1(scos_cos.POT(), kBlack);
+  TH1D* hcos_nus = scos_nus.ToTH1(scos_cos.POT(), kBlack);
+  TH1D* hcos_maj = scos_maj.ToTH1(scos_cos.POT(), kBlack);
+  TH1D* hcos_nus_Tkl = scos_nus_Tkl.ToTH1(scos_cos.POT(), kRed);
+  TH1D* hcos_maj_Tkl = scos_maj_Tkl.ToTH1(scos_cos.POT(), kRed);
+  TH1D* hcos_cos_Tkl = scos_cos_Tkl.ToTH1(scos_cos.POT(), kRed);
+  TH1D* hcos_nus_Tkl_alt = scos_nus_diryTkl.ToTH1(scos_cos.POT(), kGreen);
+  TH1D* hcos_maj_Tkl_alt = scos_maj_diryTkl.ToTH1(scos_cos.POT(), kGreen);
+  TH1D* hcos_nus_OPF = scos_nus_OPF.ToTH1(scos_cos.POT(), kBlue);
+  TH1D* hcos_maj_OPF = scos_maj_OPF.ToTH1(scos_cos.POT(), kBlue);
+  TH1D* hcos_cos_OPF = scos_cos_OPF.ToTH1(scos_cos.POT(), kBlue);
+  TH1D* hcos_nus_diry = scos_nus_diry.ToTH1(scos_cos.POT(), kGreen);
+  TH1D* hcos_maj_diry = scos_maj_diry.ToTH1(scos_cos.POT(), kGreen);
+  TH1D* hcos_cos_diry = scos_cos_diry.ToTH1(scos_cos.POT(), kGreen);
+  TH1D* hcos_nus_diryTkl = scos_nus_diryTkl.ToTH1(scos_cos.POT(), kGreen);
+  TH1D* hcos_maj_diryTkl = scos_maj_diryTkl.ToTH1(scos_cos.POT(), kGreen);
+  TH1D* hcos_cos_diryTkl = scos_cos_diryTkl.ToTH1(scos_cos.POT(), kGreen);
+  TH1D* hcos_nus_OPFdiry = scos_nus_OPFdiry.ToTH1(scos_cos.POT(), kGreen);
+  TH1D* hcos_maj_OPFdiry = scos_maj_OPFdiry.ToTH1(scos_cos.POT(), kGreen);
+  //TH1D* hcos_time_OPFdiry = scos_time_OPFdiry.ToTH1(scos_cos.POT(), kOrange);
+  TH1D* hcos_cos_OPFdiry = scos_cos_OPFdiry.ToTH1(scos_cos.POT(), kGreen);
+  TH1D* hcos_nus_OPFdiryTkl = scos_nus_OPFdiryTkl.ToTH1(scos_cos.POT(), kRed);
+  TH1D* hcos_nus_OPFdiryTkl_alt = scos_nus_OPFdiryTkl.ToTH1(scos_cos.POT(), kBlue);
+  TH1D* hcos_maj_OPFdiryTkl = scos_maj_OPFdiryTkl.ToTH1(scos_cos.POT(), kRed);
+  TH1D* hcos_maj_OPFdiryTkl_alt = scos_maj_OPFdiryTkl.ToTH1(scos_cos.POT(), kRed);
+  TH1D* hcos_cos_OPFdiryTkl = scos_cos_OPFdiryTkl.ToTH1(scos_cos.POT(), kRed);
+  TH1D* hcos_cos_OPFdiryTkl_alt = scos_cos_OPFdiryTkl.ToTH1(scos_cos.POT(), kBlack);
+  TH1D* hcos_nus_noncosmic = scos_nus_noncosmic.ToTH1(scos_cos.POT(), kRed);
+  TH1D* hcos_maj_noncosmic = scos_maj_noncosmic.ToTH1(scos_cos.POT(), kRed);
+  TH1D* hcos_nus_cosmic = scos_nus_cosmic.ToTH1(scos_cos.POT(), kBlue);
+  TH1D* hcos_maj_cosmic = scos_maj_cosmic.ToTH1(scos_cos.POT(), kBlue);
+  TH1D* hcos_nus_noncosmicTkl = scos_nus_noncosmicTkl.ToTH1(scos_cos.POT(), kRed);
+  TH1D* hcos_maj_noncosmicTkl = scos_maj_noncosmicTkl.ToTH1(scos_cos.POT(), kRed);
+  TH1D* hcos_nus_cosmicTkl = scos_nus_cosmicTkl.ToTH1(scos_cos.POT(), kBlue);
+  TH1D* hcos_maj_cosmicTkl = scos_maj_cosmicTkl.ToTH1(scos_cos.POT(), kBlue);
+  TH1D* hcos_nus_Nu = scos_nus_Nu.ToTH1(scos_cos.POT(), kBlack);
+  TH1D* hcos_maj_Nu = scos_maj_Nu.ToTH1(scos_cos.POT(), kBlack);
+  TH1D* hcos_maj_Contained = scos_maj_Contained.ToTH1(scos_cos.POT(), kBlack);
+  TH1D* hcos_maj_Contained_alt = scos_maj_Contained.ToTH1(scos_cos.POT(), kGreen);
+  TH1D* hcos_maj_NuContained = scos_maj_NuContained.ToTH1(scos_cos.POT(), kRed);
+  TH1D* hcos_maj_NoNuContained = scos_maj_NoNuContained.ToTH1(scos_cos.POT(), kBlue);
+
+  TH1D* htkl_nus = stkl_nus.ToTH1(scos_cos.POT(),kBlue);
+  TH1D* htkl_maj = stkl_maj.ToTH1(scos_cos.POT(),kRed);
+  TH1D* htkl_cos = stkl_cos.ToTH1(scos_cos.POT(),kBlack);
+  TH1D* htkl_nus_OPFdiry = stkl_nus_OPFdiry.ToTH1(scos_cos.POT(),kBlue);
+  TH1D* htkl_maj_OPFdiry = stkl_maj_OPFdiry.ToTH1(scos_cos.POT(),kRed);
+  TH1D* htkl_cos_OPFdiry = stkl_cos_OPFdiry.ToTH1(scos_cos.POT(),kBlack);
+  TH1D* htkl_maj_alt = stkl_maj_OPFdiry.ToTH1(scos_cos.POT(),kGreen);
+  TH1D* htkl_maj_noncosmic = stkl_maj_noncosmic.ToTH1(scos_cos.POT(),kRed);
+  TH1D* htkl_maj_cosmic = stkl_maj_cosmic.ToTH1(scos_cos.POT(),kBlue);
+  //TH1D* htkl_time_cosmic = stkl_time_cosmic.ToTH1(scos_cos.POT(),kOrange);
+
+  TH1D* henergy_nus = senergy_nus.ToTH1(scos_cos.POT(),kBlack);
+  TH1D* henergy_maj = senergy_maj.ToTH1(scos_cos.POT(),kBlack);
+
+  TH2* hmom = smom.ToTH2(scos_cos.POT());
+
+  TH1* hdedx_all    = dedx_all.ToTH1(dedx_all.POT(), kBlack);
+  TH1* hdedx_allMC  = dedx_allMC.ToTH1(dedx_all.POT(), kBlue);
+  //TH1* hdedx_allMC  = dedx_allMC.ToTH1(dedx_all.POT(), kBlue);
+  TH1* hdedx_allNoSpillCut = dedx_allNoSpillCut.ToTH1(dedx_all.POT(), kRed); //no spill cut
+  TH1* hdedx_allMCNoSpillCut = dedx_allMCNoSpillCut.ToTH1(dedx_all.POT(), kGreen);
+  ////sOpFlashTime[Nus,Maj,Cos]+eventually CUT
+  TH1* hdedx_rockMC = dedx_rockMC.ToTH1(dedx_all.POT(), kRed);
+
+  TH1* hOpFlashTimeNus = sOpFlashTimeNus->ToTH1(scos_cos.POT(),kBlack);
+  TH1* hOpFlashTimeNusCUT = sOpFlashTimeNusCUT->ToTH1(scos_cos.POT(),kRed);
+  
+  
+  TCanvas* cFlashNus = new TCanvas("cFlashNus","");
+  hOpFlashTimeNus -> Draw("hist");
+  hOpFlashTimeNusCUT -> Draw("hist same");
+  //hcos_nus_diry -> Draw("hist same");
+  //leg->Draw("same");
+  cFlashNus -> Print("flashNus.pdf");
+
+
+
+  std::ofstream histooutfile("entriesIndedx.txt");
+  if (histooutfile.is_open()) {
+    histooutfile << "All entries: " << hdedx_all->Integral() << " w/spill cut\n";
+    histooutfile << "All entries: " << hdedx_allNoSpillCut->Integral() << " no spill cut\n";
+    histooutfile << "MC  entries: " << hdedx_allMC->Integral() << "\n";
+    histooutfile << "MC  entries: " << hdedx_allMCNoSpillCut->Integral() << " no spill cut\n";
+    histooutfile.close();
+    std::cout << "Successfully wrote to file." << std::endl;
+  }
+
+  /*
+  TH1D* hCRTPMTTime = s->ToTH1(6.0e20);
+  TH1D* hCRTPMTTime_cut = s_cut->ToTH1(6.0e20);
+  TH1D* hcos = scos.ToTH1(6.0e20);
+  TH1D* hcos_cut = scos_cut.ToTH1(6.0e20);
+  */
+  TFile f("histos_CRTPMTMatching.root", "RECREATE");
+
+  hcos_nus -> Write("hcos_nus");
+  hcos_maj -> Write("hcos_maj");
+  hcos_cos -> Write("hcos_cos");
+  hcos_nus_diry -> Write("hcos_nus_diry");
+  hcos_maj_diry -> Write("hcos_maj_diry");
+  hcos_cos_diry -> Write("hcos_cos_diry");
+  hcos_nus_OPF -> Write("hcos_nus_OPF");
+  hcos_maj_OPF -> Write("hcos_maj_OPF");
+  hcos_cos_OPF -> Write("hcos_cos_OPF");
+  hcos_nus_Tkl -> Write("hcos_nus_Tkl");
+  hcos_maj_Tkl -> Write("hcos_maj_Tkl");
+  hcos_cos_Tkl -> Write("hcos_cos_Tkl");
+  hcos_nus_OPFdiry -> Write("hcos_nus_OPFdiry");
+  hcos_maj_OPFdiry -> Write("hcos_maj_OPFdiry");
+  //hcos_time_OPFdiry -> Write("hcos_time_OPFdiry");
+  hcos_cos_OPFdiry -> Write("hcos_cos_OPFdiry");
+  hcos_nus_OPFdiryTkl -> Write("hcos_nus_OPFdiryTkl");
+  hcos_maj_OPFdiryTkl -> Write("hcos_maj_OPFdiryTkl");
+  hcos_cos_OPFdiryTkl -> Write("hcos_cos_OPFdiryTkl");
+  hcos_nus_noncosmic -> Write("hcos_nus_noncosmic");
+  hcos_maj_noncosmic -> Write("hcos_maj_noncosmic");
+  hcos_nus_cosmic -> Write("hcos_nus_cosmic");
+  hcos_maj_cosmic -> Write("hcos_maj_cosmic");
+  hcos_nus_noncosmicTkl -> Write("hcos_nus_noncosmicTkl");
+  hcos_maj_noncosmicTkl -> Write("hcos_maj_noncosmicTkl");
+  hcos_nus_cosmicTkl -> Write("hcos_nus_cosmicTkl");
+  hcos_maj_cosmicTkl -> Write("hcos_maj_cosmicTkl");
+  hcos_nus_Nu -> Write("hcos_nus_Nu");
+  hcos_maj_Nu -> Write("hcos_maj_Nu");
+  hcos_maj_Contained -> Write("hcos_maj_Contained");
+  hcos_maj_NuContained -> Write("hcos_maj_NuContained");
+  hcos_maj_NoNuContained -> Write("hcos_maj_NoNuContained");
+
+  htkl_nus -> Write("htkl_nus");
+  htkl_maj -> Write("htkl_maj");
+  htkl_cos -> Write("htkl_cos");
+  htkl_nus_OPFdiry -> Write("htkl_nus_OPFdiry");
+  htkl_maj_OPFdiry -> Write("htkl_maj_OPFdiry");
+  htkl_cos_OPFdiry -> Write("htkl_cos_OPFdiry");
+  htkl_maj_noncosmic -> Write("htkl_maj_noncosmic");
+  htkl_maj_cosmic -> Write("htkl_maj_cosmic");
+  //htkl_time_cosmic -> Write("htkl_time_cosmic");
+
+  henergy_nus -> Write("henergy_nus");
+  henergy_maj -> Write("henergy_maj");
+
+  hmom -> Write("hmom");
+
+  hdedx_all->Write("hdedx_all");
+  hdedx_allMC->Write("hdedx_allMC");
+  hdedx_rockMC->Write("hdedx_rockMC");
+
+
+  ////////////////////////////////////
+  //             .PNG              //
+  ///////////////////////////////////
+
+  TLegend *leg = new TLegend(0.15, 0.75, 0.45, 0.9, NULL,"brNDC");
+  leg -> SetFillStyle(0);
+  leg -> SetTextSize(0.05);
+  leg -> SetBorderSize(0);
+  leg -> AddEntry(hcos_nus,          "nonfiducial cut",       "l");
+  leg -> AddEntry(hcos_nus_OPF,          "OpFlash cut",       "l");
+  leg -> AddEntry(hcos_nus_diry,          "CRdiry cut",       "l");
+
+  TLegend *leg2 = new TLegend(0.15, 0.75, 0.45, 0.9, NULL,"brNDC");
+  leg2 -> SetFillStyle(0);
+  leg2 -> SetTextSize(0.05);
+  leg2 -> SetBorderSize(0);
+  leg2 -> AddEntry(hcos_nus_diry,          "CRdiry & OPflash",       "l");
+  leg2 -> AddEntry(hcos_nus_cosmic,          "cosmics",       "l");
+  leg2 -> AddEntry(hcos_nus_noncosmic,          "neutrinos",       "l");
+
+  TLegend *leg3 = new TLegend(0.15, 0.75, 0.45, 0.9, NULL,"brNDC");
+  leg3 -> SetFillStyle(0);
+  leg3 -> SetTextSize(0.05);
+  leg3 -> SetBorderSize(0);
+  leg3 -> AddEntry(hcos_nus_diry,          "CRdiry & OPflash & CRTPMT",       "l");
+  leg3 -> AddEntry(hcos_nus_cosmic,          "cosmics",       "l");
+  leg3 -> AddEntry(hcos_nus_noncosmic,          "neutrinos",       "l");
+
+  TLegend *leg4 = new TLegend(0.15, 0.75, 0.45, 0.9, NULL,"brNDC");
+  leg4 -> SetFillStyle(0);
+  leg4 -> SetTextSize(0.05);
+  leg4 -> SetBorderSize(0);
+  leg4 -> AddEntry(hcos_nus_diry,          "CRdiry & OPflash & Tkl",       "l");
+  leg4 -> AddEntry(hcos_nus_cosmic,          "cosmics",       "l");
+  leg4 -> AddEntry(hcos_nus_noncosmic,          "neutrinos",       "l");
+
+  TLegend *leg5 = new TLegend(0.15, 0.75, 0.45, 0.9, NULL,"brNDC");
+  leg5 -> SetFillStyle(0);
+  leg5 -> SetTextSize(0.05);
+  leg5 -> SetBorderSize(0);
+  leg5 -> AddEntry(hcos_nus,          "nonfiducial cut",       "l");
+  leg5 -> AddEntry(hcos_nus_OPF,          "OpFlash cut",       "l");
+  leg5 -> AddEntry(hcos_nus_diry,          "CRdiry cut",       "l");
+  leg5 -> AddEntry(hcos_cos_OPFdiryTkl,          "Track Length cut",      "l");
+
+  TLegend *leg6 = new TLegend(0.15, 0.75, 0.45, 0.9, NULL,"brNDC");
+  leg6 -> SetFillStyle(0);
+  leg6 -> SetTextSize(0.05);
+  leg6 -> SetBorderSize(0);
+  leg6 -> AddEntry(hcos_nus_diry,          "CRdiry & OPflash & Track Length",       "l");
+  leg6 -> AddEntry(hcos_nus_cosmic,          "cosmics",       "l");
+  leg6 -> AddEntry(hcos_nus_noncosmic,          "neutrinos",       "l");
+
+  TLegend *leg7 = new TLegend(0.15, 0.75, 0.45, 0.9, NULL,"brNDC");
+  leg7 -> SetFillStyle(0);
+  leg7 -> SetTextSize(0.05);
+  leg7 -> SetBorderSize(0);
+  //leg7 -> AddEntry(htkl_cos,          "Data",       "l");
+  leg7 -> AddEntry(htkl_nus,          "Rock MC",       "l");
+  leg7 -> AddEntry(htkl_maj,          "All MC",       "l");
+
+  TLegend *leg8 = new TLegend(0.15, 0.75, 0.45, 0.9, NULL,"brNDC");
+  leg8 -> SetFillStyle(0);
+  leg8 -> SetTextSize(0.05);
+  leg8 -> SetBorderSize(0);
+  leg8 -> AddEntry(htkl_maj_alt,          "All",       "l");
+  leg8 -> AddEntry(htkl_maj_cosmic,          "Cosmics",       "l");
+  leg8 -> AddEntry(htkl_maj_noncosmic,          "Neutrinos",       "l");
+  //leg8 -> AddEntry(htkl_time_cosmic, "intime cosmics", "l");
+
+  TLegend *leg9 = new TLegend(0.15, 0.75, 0.45, 0.9, NULL,"brNDC");
+  leg9 -> SetFillStyle(0);
+  leg9 -> SetTextSize(0.05);
+  leg9 -> SetBorderSize(0);
+  leg9 -> AddEntry(hcos_nus_diry,          "CRdiry & OPflash & Tkl",       "l");
+  leg9 -> AddEntry(hcos_nus_cosmic,          "cosmics",       "l");
+  //leg9 -> AddEntry(hcos_time_OPFdiry,          "intime cosmics",       "l");
+  leg9 -> AddEntry(hcos_nus_noncosmic,          "neutrinos",       "l");
+
+  TLegend *leg10 = new TLegend(0.15, 0.75, 0.45, 0.9, NULL,"brNDC");
+  leg10 -> SetFillStyle(0);
+  leg10 -> SetTextSize(0.05);
+  leg10 -> SetBorderSize(0);
+  leg10 -> AddEntry(hcos_maj_diry,          "All muons passing cuts",       "l");
+  leg10 -> AddEntry(hcos_maj_Contained,          "Only stopping tracks",       "l");
+
+  TLegend *leg11 = new TLegend(0.65, 0.65, 0.9, 0.9, NULL,"brNDC");
+  leg11 -> SetFillStyle(0);
+  leg11 -> SetTextSize(0.05);
+  leg11 -> SetBorderSize(0);
+  leg11 -> AddEntry(hdedx_all,  "data+OpFlash","l");
+  leg11 -> AddEntry(hdedx_allMC, "MC+OpFlash(MC)", "l");
+  leg11 -> AddEntry(hdedx_allNoSpillCut, "data","l");
+  leg11 -> AddEntry(hdedx_allMCNoSpillCut, "MC","l");
+  
+  TLegend *legMCRockvsAll = new TLegend(0.65, 0.65, 0.9, 0.9, NULL,"brNDC");
+  legMCRockvsAll-> SetFillStyle(0);
+  legMCRockvsAll -> SetTextSize(0.05);
+  legMCRockvsAll ->SetBorderSize(0);
+  legMCRockvsAll ->AddEntry(hdedx_allMC,  "All MC","l");
+  legMCRockvsAll ->AddEntry(hdedx_rockMC, "Rock MC","l");
+
+
+  hcos_nus -> SetTitle("");
+  hcos_nus -> GetYaxis() -> SetTitle("Slices");
+  hcos_nus -> GetXaxis() -> SetTitle("Reco cos(#theta_{NuMI})");
+  hcos_nus -> GetYaxis() -> CenterTitle();
+  hcos_nus -> GetXaxis() -> CenterTitle();
+
+  hcos_maj -> SetTitle("");
+  hcos_maj -> GetYaxis() -> SetTitle("Slices");
+  hcos_maj -> GetXaxis() -> SetTitle("Reco cos(#theta_{NuMI})");
+  hcos_maj -> GetYaxis() -> CenterTitle();
+  hcos_maj -> GetXaxis() -> CenterTitle();
+
+  hcos_cos -> SetTitle("");
+  hcos_cos -> GetYaxis() -> SetTitle("Slices");
+  hcos_cos -> GetXaxis() -> SetTitle("Reco cos(#theta_{NuMI})");
+  hcos_cos -> GetYaxis() -> CenterTitle();
+  hcos_cos -> GetXaxis() -> CenterTitle();
+
+  hcos_nus_OPFdiry -> SetTitle("");
+  hcos_nus_OPFdiry -> GetYaxis() -> SetTitle("Slices");
+  hcos_nus_OPFdiry -> GetXaxis() -> SetTitle("Reco cos(#theta_{NuMI})");
+  hcos_nus_OPFdiry -> GetYaxis() -> CenterTitle();
+  hcos_nus_OPFdiry -> GetXaxis() -> CenterTitle();
+
+  hcos_maj_OPFdiry -> SetTitle("");
+  hcos_maj_OPFdiry -> GetYaxis() -> SetTitle("Slices");
+  hcos_maj_OPFdiry -> GetXaxis() -> SetTitle("Reco cos(#theta_{NuMI})");
+  hcos_maj_OPFdiry -> GetYaxis() -> CenterTitle();
+  hcos_maj_OPFdiry -> GetXaxis() -> CenterTitle();
+
+  hcos_cos_OPFdiry -> SetTitle("");
+  hcos_cos_OPFdiry -> GetYaxis() -> SetTitle("Slices");
+  hcos_cos_OPFdiry -> GetXaxis() -> SetTitle("Reco cos(#theta_{NuMI})");
+  hcos_cos_OPFdiry -> GetYaxis() -> CenterTitle();
+  hcos_cos_OPFdiry -> GetXaxis() -> CenterTitle();
+
+  hcos_nus_diry -> SetTitle("");
+  hcos_nus_diry -> GetYaxis() -> SetTitle("Slices");
+  hcos_nus_diry -> GetXaxis() -> SetTitle("Reco cos(#theta_{NuMI})");
+  hcos_nus_diry -> GetYaxis() -> CenterTitle();
+  hcos_nus_diry -> GetXaxis() -> CenterTitle();
+
+  hcos_maj_diry -> SetTitle("");
+  hcos_maj_diry -> GetYaxis() -> SetTitle("Slices");
+  hcos_maj_diry -> GetXaxis() -> SetTitle("Reco cos(#theta_{NuMI})");
+  hcos_maj_diry -> GetYaxis() -> CenterTitle();
+  hcos_maj_diry -> GetXaxis() -> CenterTitle();
+
+  hcos_nus_Tkl_alt -> SetTitle("");
+  hcos_nus_Tkl_alt -> GetYaxis() -> SetTitle("Slices");
+  hcos_nus_Tkl_alt -> GetXaxis() -> SetTitle("Reco cos(#theta_{NuMI})");
+  hcos_nus_Tkl_alt -> GetYaxis() -> CenterTitle();
+  hcos_nus_Tkl_alt -> GetXaxis() -> CenterTitle();
+
+  hcos_maj_Tkl_alt -> SetTitle("");
+  hcos_maj_Tkl_alt -> GetYaxis() -> SetTitle("Slices");
+  hcos_maj_Tkl_alt -> GetXaxis() -> SetTitle("Reco cos(#theta_{NuMI})");
+  hcos_maj_Tkl_alt -> GetYaxis() -> CenterTitle();
+  hcos_maj_Tkl_alt -> GetXaxis() -> CenterTitle();
+
+  htkl_cos -> SetTitle("");
+  htkl_cos -> GetYaxis() -> SetTitle("Slices");
+  htkl_cos -> GetXaxis() -> SetTitle("Longest Track Length (cm)");
+  htkl_cos -> GetYaxis() -> CenterTitle();
+  htkl_cos -> GetXaxis() -> CenterTitle();
+
+  htkl_cos_OPFdiry -> SetTitle("");
+  htkl_cos_OPFdiry -> GetYaxis() -> SetTitle("Slices");
+  htkl_cos_OPFdiry -> GetXaxis() -> SetTitle("Longest Track Length (cm)");
+  htkl_cos_OPFdiry -> GetYaxis() -> CenterTitle();
+  htkl_cos_OPFdiry -> GetXaxis() -> CenterTitle();
+
+  htkl_maj_alt -> SetTitle("");
+  htkl_maj_alt -> GetYaxis() -> SetTitle("Slices");
+  htkl_maj_alt -> GetXaxis() -> SetTitle("Longest Track Length (cm)");
+  htkl_maj_alt -> GetYaxis() -> CenterTitle();
+  htkl_maj_alt -> GetXaxis() -> CenterTitle();
+
+  hcos_cos_OPFdiryTkl_alt -> SetTitle("");
+  hcos_cos_OPFdiryTkl_alt -> GetYaxis() -> SetTitle("Slices");
+  hcos_cos_OPFdiryTkl_alt -> GetXaxis() -> SetTitle("Reco cos(#theta_{NuMI})");
+  hcos_cos_OPFdiryTkl_alt -> GetYaxis() -> CenterTitle();
+  hcos_cos_OPFdiryTkl_alt -> GetXaxis() -> CenterTitle();
+
+  hcos_maj_Contained_alt -> SetTitle("");
+  hcos_maj_Contained_alt -> GetYaxis() -> SetTitle("Slices");
+  hcos_maj_Contained_alt -> GetXaxis() -> SetTitle("Reco cos(#theta_{NuMI})");
+  hcos_maj_Contained_alt -> GetYaxis() -> CenterTitle();
+  hcos_maj_Contained_alt -> GetXaxis() -> CenterTitle();
+
+  henergy_nus -> SetTitle("");
+  henergy_nus -> GetYaxis() -> SetTitle("Frequency");
+  henergy_nus -> GetXaxis() -> SetTitle("Neutrino Energy (GeV)");
+  henergy_nus -> GetYaxis() -> CenterTitle();
+  henergy_nus -> GetXaxis() -> CenterTitle();
+
+  henergy_maj -> SetTitle("");
+  henergy_maj -> GetYaxis() -> SetTitle("Frequency");
+  henergy_maj -> GetXaxis() -> SetTitle("Neutrino Energy (GeV)");
+  henergy_maj -> GetYaxis() -> CenterTitle();
+  henergy_maj -> GetXaxis() -> CenterTitle();
+
+  hmom -> SetTitle("");
+  hmom -> GetYaxis() -> SetTitle("Track Length (cm)");
+  hmom -> GetXaxis() -> SetTitle("Muon Momentum (GeV/c)");
+  hmom -> GetYaxis() -> CenterTitle();
+  hmom -> GetXaxis() -> CenterTitle();
+
+  hdedx_allNoSpillCut ->SetTitle("Maximum dE/dx of track");
+  hdedx_allNoSpillCut -> GetXaxis() -> SetTitle("dE/dX (MeV/cm)");
+  
+
+  hdedx_rockMC -> SetTitle("");
+  //hdedx_rockMC -> GetYaxis() -> SetTitle("Track Length (cm)");
+  hdedx_rockMC -> GetXaxis() -> SetTitle("dE/dx (MeV/cm)");
+  hdedx_rockMC -> GetYaxis() -> CenterTitle();
+  hdedx_rockMC -> GetXaxis() -> CenterTitle();
+
+  hdedx_allMC -> SetTitle("");
+  //hdedx_rockMC -> GetYaxis() -> SetTitle("Track Length (cm)");
+  hdedx_allMC -> GetXaxis() -> SetTitle("dE/dx (MeV/cm)");
+  hdedx_allMC -> GetYaxis() -> CenterTitle();
+  hdedx_allMC -> GetXaxis() -> CenterTitle();
+
+
+  TCanvas* cNUS = new TCanvas("cNUS","");
+  hcos_nus -> Draw("hist");
+  hcos_nus_OPF -> Draw("hist same");
+  hcos_nus_diry -> Draw("hist same");
+  leg->Draw("same");
+  cNUS -> Print("costh_nus.png");
+
+  TCanvas* cCOS = new TCanvas("cCOS","");
+  hcos_cos -> Draw("hist");
+  hcos_cos_OPF -> Draw("hist same");
+  hcos_cos_diry -> Draw("hist same");
+  leg->Draw("same");
+  cCOS -> Print("costh_cos.png");
+
+  TCanvas* cprog_data = new TCanvas("cprog_data","");
+  hcos_cos -> Draw("hist");
+  hcos_cos_OPF -> Draw("hist same");
+  hcos_cos_OPFdiry -> Draw("hist same");
+  leg->Draw("same");
+  cprog_data -> Print("prog_data.png");
+
+  TCanvas* cprog_data_zoom = new TCanvas("cprog_data_zoom","");
+  hcos_cos_OPFdiry -> Draw("hist");
+  leg->Draw("same");
+  cprog_data_zoom -> Print("prog_data_zoom.png");
+
+  TCanvas* cprog_data_Tkl = new TCanvas("cprog_data_Tkl","");
+  hcos_cos -> Draw("hist");
+  hcos_cos_OPF -> Draw("hist same");
+  hcos_cos_OPFdiry -> Draw("hist same");
+  hcos_cos_OPFdiryTkl -> Draw("hist same");
+  leg5->Draw("same");
+  cprog_data_Tkl -> Print("prog_data_Tkl.png");
+
+  TCanvas* cprog_data_Tkl_zoom = new TCanvas("cprog_data_Tkl_zoom","");
+  hcos_cos_OPFdiry -> Draw("hist");
+  hcos_cos_OPFdiryTkl -> Draw("hist same");
+  leg5->Draw("same");
+  cprog_data_Tkl_zoom -> Print("prog_data_Tkl_zoom.png");
+
+  TCanvas* cprog_MC = new TCanvas("cprog_MC","");
+  hcos_nus -> Draw("hist");
+  hcos_nus_OPF -> Draw("hist same");
+  hcos_nus_OPFdiry -> Draw("hist same");
+  leg->Draw("same");
+  cprog_MC -> Print("prog_MC.png");
+
+  TCanvas* cprog_MC_zoom = new TCanvas("cprog_MC_zoom","");
+  hcos_nus_OPFdiry -> Draw("hist");
+  leg->Draw("same");
+  cprog_MC_zoom -> Print("prog_MC_zoom.png");
+
+  TCanvas* cprog_Maj = new TCanvas("cprog_Maj","");
+  hcos_maj -> Draw("hist");
+  hcos_maj_OPF -> Draw("hist same");
+  hcos_maj_OPFdiry -> Draw("hist same");
+  leg->Draw("same");
+  cprog_Maj -> Print("prog_Maj.png");
+
+  TCanvas* cprog_Maj_zoom = new TCanvas("cprog_Maj_zoom","");
+  hcos_maj_OPFdiry -> Draw("hist");
+  leg->Draw("same");
+  cprog_Maj_zoom -> Print("prog_Maj_zoom.png");
+
+  TCanvas* cprog_MC_Tkl = new TCanvas("cprog_MC_Tkl","");
+  hcos_nus -> Draw("hist");
+  hcos_nus_OPF -> Draw("hist same");
+  hcos_nus_OPFdiry -> Draw("hist same");
+  hcos_nus_OPFdiryTkl -> Draw("hist same");
+  leg5->Draw("same");
+  cprog_MC_Tkl -> Print("prog_MC_Tkl.png");
+
+  TCanvas* cprog_MC_Tkl_zoom = new TCanvas("cprog_MC_Tkl_zoom","");
+  hcos_nus_OPFdiry -> Draw("hist");
+  hcos_nus_OPFdiryTkl -> Draw("hist same");
+  leg5->Draw("same");
+  cprog_MC_Tkl_zoom -> Print("prog_MC_Tkl_zoom.png");
+
+  TCanvas* cprog_Maj_Tkl = new TCanvas("cprog_Maj_Tkl","");
+  hcos_maj -> Draw("hist");
+  hcos_maj_OPF -> Draw("hist same");
+  hcos_maj_OPFdiry -> Draw("hist same");
+  hcos_maj_OPFdiryTkl -> Draw("hist same");
+  leg5->Draw("same");
+  cprog_Maj_Tkl -> Print("prog_Maj_Tkl.png");
+
+  TCanvas* cprog_Maj_Tkl_zoom = new TCanvas("cprog_Maj_Tkl_zoom","");
+  hcos_maj_OPFdiry -> Draw("hist");
+  hcos_maj_OPFdiryTkl -> Draw("hist same");
+  leg5->Draw("same");
+  cprog_Maj_Tkl_zoom -> Print("prog_Maj_Tkl_zoom.png");
+
+  TCanvas* cpreCRT_nus = new TCanvas("cpreCRT_nus","");
+  hcos_nus_diry -> Draw("hist");
+  hcos_nus_noncosmic -> Draw("hist same");
+  hcos_nus_cosmic -> Draw("hist same");
+  leg2->Draw("same");
+  cpreCRT_nus -> Print("preCut_nus.png");
+
+  TCanvas* cpreCRT_maj = new TCanvas("cpreCRT_maj","");
+  cpreCRT_maj -> SetLogy();
+  hcos_maj_diry -> Draw("hist");
+  hcos_maj_noncosmic -> Draw("hist same");
+  hcos_maj_cosmic -> Draw("hist same");
+  leg2->Draw("same");
+  cpreCRT_maj -> Print("preCut_maj.png");
+
+  TCanvas* cintime = new TCanvas("cintime","");
+  cintime -> SetLogy();
+  hcos_maj_diry -> Draw("hist");
+  hcos_maj_noncosmic -> Draw("hist same");
+  hcos_maj_cosmic -> Draw("hist same");
+  //hcos_time_OPFdiry -> Draw("hist same");
+  leg9->Draw("same");
+  cintime -> Print("intime_comp.png");
+
+  TCanvas* ccontained_maj = new TCanvas("ccontained_maj","");
+  cpreCRT_maj -> SetLogy();
+  hcos_maj_Contained_alt -> Draw("hist");
+  hcos_maj_NuContained -> Draw("hist same");
+  hcos_maj_NoNuContained -> Draw("hist same");
+  leg2->Draw("same");
+  ccontained_maj -> Print("contained_maj.png");
+
+  TCanvas* cpostTkl_nus = new TCanvas("cpostTkl_nus","");
+  hcos_nus_Tkl_alt -> Draw("hist");
+  hcos_nus_noncosmicTkl -> Draw("hist same");
+  hcos_nus_cosmicTkl -> Draw("hist same");
+  leg6->Draw("same");
+  cpostTkl_nus -> Print("postTkl_nus.png");
+
+  TCanvas* cpostTkl_maj = new TCanvas("cpostTkl_maj","");
+  hcos_maj_Tkl_alt -> Draw("hist");
+  hcos_maj_noncosmicTkl -> Draw("hist same");
+  hcos_maj_cosmicTkl -> Draw("hist same");
+  leg6->Draw("same");
+  cpostTkl_maj -> Print("postTkl_maj.png");
+
+  TCanvas* cTkl = new TCanvas("cTkl","");
+  //htkl_cos -> Scale(1./htkl_cos -> Integral());
+  //htkl_maj -> Scale(1./htkl_maj -> Integral());
+  //htkl_nus -> Scale(1./htkl_nus -> Integral());
+  htkl_cos  -> GetYaxis()->SetRangeUser(0.,1.3 * htkl_nus -> GetMaximum());
+  htkl_cos -> Draw("E1");
+  htkl_maj -> Draw("hist same");
+  htkl_nus -> Draw("hist same");
+  leg7->Draw("same");
+  cTkl -> Print("Tkl.png");
+
+  TCanvas* cTkl_sel = new TCanvas("cTkl_sel","");
+  //htkl_cos_OPFdiry -> Scale(2);
+  //htkl_maj_OPFdiry -> Scale(2);
+  //htkl_nus_OPFdiry -> Scale(2);
+  htkl_cos_OPFdiry -> GetYaxis()->SetRangeUser(0.,1.3 * htkl_nus_OPFdiry -> GetMaximum());
+  htkl_cos_OPFdiry -> Draw("E1");
+  htkl_maj_OPFdiry -> Draw("hist same");
+  htkl_nus_OPFdiry -> Draw("hist same");
+  leg7->Draw("same");
+  cTkl_sel -> Print("Tkl_sel.png");
+
+  TCanvas* cTkl_comp = new TCanvas("cTkl_comp","");
+  htkl_maj_alt -> GetYaxis()->SetRangeUser(0.,1.3 * htkl_maj_alt -> GetMaximum());
+  htkl_maj_alt -> Draw("hist");
+  htkl_maj_noncosmic -> Draw("hist same");
+  htkl_maj_cosmic -> Draw("hist same");
+  //htkl_time_cosmic -> Draw("hist same");
+  leg8->Draw("same");
+  cTkl_comp -> Print("Tkl_comp.png");
+
+  TCanvas* cTkl_time = new TCanvas("cTkl_time","");
+  //htkl_time_cosmic -> Draw("hist");
+  leg8->Draw("same");
+  cTkl_time -> Print("Tkl_time.png");
+
+  TCanvas* ccos_comp = new TCanvas("ccos_comp","");
+  //hcos_cos_OPFdiryTkl_alt -> Scale(3);
+  //hcos_maj_OPFdiryTkl_alt -> Scale(3);
+  //hcos_nus_OPFdiryTkl_alt -> Scale(3);
+  //hcos_cos_OPFdiryTkl_alt  -> GetYaxis()->SetRangeUser(0.,1.3 * hcos_cos_OPFdiryTkl_alt -> GetMaximum());
+  ccos_comp -> SetLogy();
+  hcos_nus_OPFdiryTkl_alt -> Draw("hist");
+  //hcos_cos_OPFdiryTkl_alt -> Draw("E1 same");
+  hcos_maj_OPFdiryTkl_alt -> Draw("hist same");
+  leg7->Draw("same");
+  ccos_comp -> Print("ccos_comp.png");
+
+  TCanvas* cenergy_nus = new TCanvas("cenergy_nus","");
+  henergy_nus -> Draw("hist");
+  cenergy_nus -> Print("energy_nus.png");
+
+  TCanvas* cenergy_maj = new TCanvas("cenergy_maj","");
+  henergy_maj -> Draw("hist");
+  cenergy_maj -> Print("energy_maj.png");
+
+  TCanvas* cNu_maj = new TCanvas("cNu_maj","");
+  hcos_maj_Nu -> Draw("hist");
+  hcos_maj_noncosmic -> Draw("hist same");
+  cNu_maj -> Print("Nu_maj.png");
+
+  TCanvas* ccontained_comp = new TCanvas("ccontained_comp","");
+  hcos_maj_Contained -> Scale(.95);
+  hcos_maj_diry -> Draw("hist");
+  hcos_maj_Contained -> Draw("hist same");
+  ccontained_comp -> Print("contained_comp.png");
+
+  TCanvas* cmom = new TCanvas("cmom","");
+  hmom -> Draw("COLZ");
+  cmom -> Print("mom.png");
+
+  TCanvas* cdedx = new TCanvas("cdedx", "");
+  hdedx_allNoSpillCut->Draw("histo");
+  hdedx_allMC->Draw("hist same");
+  hdedx_all->Draw("hist same");
+  hdedx_allMCNoSpillCut->Draw("hist same");
+  leg11->Draw("same");
+  cdedx -> Print("dedx.png");
+
+
+  //hdedx_rockMC
+  TCanvas* cdedxRockvsAllMC = new TCanvas("dEdxMC", "");
+  hdedx_allMC->Draw("histo");
+  hdedx_rockMC->Draw("hist same");
+  legMCRockvsAll->Draw("same");
+  cdedxRockvsAllMC -> Print("dedxRockvsAllMC.png");
+
+  ////////////////////////////////////
+  //            INTEGRALS           //
+  ///////////////////////////////////
+
+  ofstream outfile;
+  outfile.open ("integrals.txt");
+  outfile << endl << "Rock" << endl;
+  outfile << "NoCut " << hcos_nus->Integral() << endl;
+  outfile << "OpFlash " << hcos_nus_OPF->Integral() << endl;
+  outfile << "Diry " << hcos_nus_diry->Integral() << endl;
+  outfile << "Track Length " << hcos_nus_Tkl->Integral() << endl;
+
+  outfile << endl << "Majority" << endl;
+  outfile << "NoCut " << hcos_maj->Integral() << endl;
+  outfile << "OpFlash " << hcos_maj_OPF->Integral() << endl;
+  outfile << "Diry " << hcos_maj_diry->Integral() << endl;
+  outfile << "Track Length " << hcos_maj_Tkl->Integral() << endl;
+
+  outfile << endl << "data" << endl;
+  outfile << "NoCut " << hcos_cos->Integral() << endl;
+  outfile << "OpFlash " << hcos_cos_OPF->Integral() << endl;
+  outfile << "Diry " << hcos_cos_diry->Integral() << endl;
+  outfile << "Track Length " << hcos_cos_Tkl->Integral() << endl;
+
+  outfile << endl << "progression for data" << endl;
+  outfile << "NoCut " << hcos_cos->Integral() << endl;
+  outfile << "+OpFlash " << hcos_cos_OPF->Integral() << endl;
+  outfile << "+Diry " << hcos_cos_OPFdiry->Integral() << endl;
+  outfile << "+TrackLength " << hcos_cos_OPFdiryTkl->Integral() << endl;
+
+  outfile << endl << "progression for Rock" << endl;
+  outfile << "NoCut " << hcos_nus->Integral() << endl;
+  outfile << "+OpFlash " << hcos_nus_OPF->Integral() << endl;
+  outfile << "+Diry " << hcos_nus_OPFdiry->Integral() << endl;
+  outfile << "+TrackLength " << hcos_nus_OPFdiryTkl->Integral() << endl;
+
+  outfile << endl << "progression for Majority" << endl;
+  outfile << "NoCut " << hcos_maj->Integral() << endl;
+  outfile << "+OpFlash " << hcos_maj_OPF->Integral() << endl;
+  outfile << "+Diry " << hcos_maj_OPFdiry->Integral() << endl;
+  outfile << "+TrackLength " << hcos_maj_OPFdiryTkl->Integral() << endl;
+
+  outfile << endl << "Neutrino vs Cosmics, pre Cut Rock" << endl;
+  outfile << "Both " << hcos_nus_diry->Integral() << endl;
+  outfile << "cosmic " << hcos_nus_cosmic->Integral() << endl;
+  outfile << "neutrino " << hcos_nus_noncosmic->Integral() << endl;
+
+  outfile << endl << "Neutrino vs Cosmics, pre Cut Majority" << endl;
+  outfile << "Both " << hcos_maj_diry->Integral() << endl;
+  outfile << "cosmic " << hcos_maj_cosmic->Integral() << endl;
+  outfile << "neutrino " << hcos_maj_noncosmic->Integral() << endl;
+
+  outfile << endl << "Neutrino vs Cosmics, post Tkl Rock" << endl;
+  outfile << "Both " << hcos_nus_Tkl_alt->Integral() << endl;
+  outfile << "cosmic " << hcos_nus_cosmicTkl->Integral() << endl;
+  outfile << "neutrino " << hcos_nus_noncosmicTkl->Integral() << endl;
+
+  outfile << endl << "Neutrino vs Cosmics, post Tkl Majority" << endl;
+  outfile << "Both " << hcos_maj_Tkl_alt->Integral() << endl;
+  outfile << "cosmic " << hcos_maj_cosmicTkl->Integral() << endl;
+  outfile << "neutrino " << hcos_maj_noncosmicTkl->Integral() << endl;
+
+  outfile << endl << "Track Length comparison " << endl;
+  outfile << "data " << (double) htkl_cos->Integral() << endl;
+  outfile << "all MC " << htkl_maj->Integral() << endl;
+  outfile << "Rock MC " << htkl_nus->Integral() << endl;
+
+  outfile << endl << "Track Length comparison post cut" << endl;
+  outfile << "data " << htkl_cos_OPFdiry->Integral() << endl;
+  outfile << "all MC " << htkl_maj_OPFdiry->Integral() << endl;
+  outfile << "Rock MC " << htkl_nus_OPFdiry->Integral() << endl;
+
+  outfile << endl << "Costh comparison post cut" << endl;
+  outfile << "data " << hcos_cos_OPFdiryTkl_alt->Integral() << endl;
+  outfile << "all MC " << hcos_maj_OPFdiryTkl_alt->Integral() << endl;
+  outfile << "Rock MC " << hcos_nus_OPFdiryTkl_alt->Integral() << endl;
+
+  outfile << endl << "POT MC " << scos_nus.POT() << endl;
+  outfile  << "POT data " << scos_cos.POT() << endl;
+  outfile << "POT maj " << scos_maj.POT() << endl;
+
+  outfile << endl << "data nocut " << scos_cos.Livetime() << endl;
+  outfile  << "maj nocut " << scos_maj.Livetime() << endl;
+  outfile << "rock nocut " << scos_nus.Livetime() << endl;
+  outfile.close();
+
+
+}

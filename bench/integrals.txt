@@ -1,0 +1,38 @@
+POT = 2.37066e+18
+POT_norm =  406.504
+
+costh:
+no cut = 1.3277e+08
+nonfiducial = 9.48709e+07
+OpFlash = 4.76994e+06
+Longest CR Diry cut  = 1.02077e+06
+
+track length
+no cuts = 3.30897e+07
+nonfiducial = 2.19911e+07
+OpFlash cut = 1.27072e+06
+LongestCRDiry = 1.46567e+06
+
+Energy
+All = 4.58398e+06
+Neutrino = 4.58398e+06
+Neutrino & Muon = 4.18307e+06
+
+Momentum
+All = 1.35028e+08
+Muon = 1.32767e+08
+Neutrino = 2.32548e+06
+Longest CR Diry cut = 1.60364e+06
+
+XY: 1.87424e+08 XZ: 1.87427e+08 YZ: 1.87421e+08
+XY_NFV:1.22141e+08 XZ_NFV:6.00137e+07 YZ_NFV:1.04512e+08
+XY_FV:6.52835e+07 XZ_FV:1.27414e+08 YZ_NFV:8.29096e+07
+
+CRDiry, OPflash, Neutrino & muon: 1.46068e+06
+Neutrino & muon: 4.18407e+06
+No Cuts: 1.8738e+08
+
+ 
+NuXY:6.93746e+06 NuXY_FV:1.03293e+06 NuXY_NFV:1.7878e+06
+NuXZ:6.78849e+06 NuXZ_FV:1.41829e+06 NuXZ_NFV:1.34187e+06
+NuYZ:6.87947e+06 NuYZ_FV:1.45041e+06 NuYZ_NFV:1.34675e+06

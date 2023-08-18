@@ -1,0 +1,4 @@
+All entries: 0 w/spill cut
+All entries: 279 no spill cut
+MC  entries: 205.41
+MC  entries: 207.659 no spill cut

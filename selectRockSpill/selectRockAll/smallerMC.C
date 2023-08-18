@@ -1,0 +1,220 @@
+#pragma once
+
+#include "TFile.h"
+#include "TH1.h"
+#include "sbnana/CAFAna/Core/Binning.h"
+#include "sbnana/CAFAna/Core/Spectrum.h"
+#include "sbnana/CAFAna/Core/SpectrumLoader.h"
+// NuMINumuXSec
+//#include "ICARUSCRTPMTMatching.h"
+#include "helper_numuCCSelCuts.h"
+
+#include "TCanvas.h"
+#include "TVector3.h"
+#include "TLegend.h"
+#include "TPaveText.h"
+#include "TStyle.h"
+#include "iostream"
+#include "fstream"
+
+using namespace ana;
+
+const SpillCut OpFlash_cut([](const caf::SRSpillProxy* sr){
+    for (const auto& opflash : sr->opflashes){
+      auto thistime =  opflash.firsttime;
+      if (thistime > -0.1 && thistime < 9.7) {
+        return true;
+      }
+    }
+    return false;
+  }
+  );
+
+const SpillCut OpFlash_MC([](const caf::SRSpillProxy* sr){
+    for (const auto& opflash : sr->opflashes){
+      auto thistime =  opflash.firsttime -  sr->hdr.triggerinfo.trigger_within_gate;
+      if (thistime > -0.1 && thistime < 9.7) {
+        return true;
+      }
+    }
+    return false;
+  }
+  );
+
+const Cut kSlcTrkDiry([](const caf::SRSliceProxy* slc) -> double {
+    if (slc->nuid.crlongtrkdiry > -0.2) {
+      return true;
+    } else {
+      return false;
+    }
+  });
+
+const Cut kContained([](const caf::SRSliceProxy* slc) -> double {
+    if (slc->nuid.crlongtrkdiry > -0.2 && kmuon_contained(slc)) {
+      return true;
+    } else {
+      return false;
+    }
+  });
+
+const Cut kHasMunNu([](const caf::SRSliceProxy* slc) -> double {
+    if (kHasNu(slc) && kmuon_contained(slc)) {
+      return true;
+    } else {
+      return false;
+    }
+  });
+
+const Cut kSlcTrkDiryTkl([](const caf::SRSliceProxy* slc) -> double {
+    if (slc->nuid.crlongtrkdiry > -0.2 && kLongestTrackLength(slc) > 15) {
+      return true;
+    } else {
+      return false;
+    }
+  });
+
+const Cut kDiryNuTkl([](const caf::SRSliceProxy* slc) -> double {
+    if (slc->nuid.crlongtrkdiry > -0.2 && kHasNu(slc) && kLongestTrackLength(slc) > 100) {
+      return true;
+    } else {
+      return false;
+    }
+  });
+
+const Cut kDiryNoNuTkl([](const caf::SRSliceProxy* slc) -> double {
+    if (slc->nuid.crlongtrkdiry > -0.2 && !kHasNu(slc) && kLongestTrackLength(slc) > 100) {
+      return true;
+    } else {
+      return false;
+    }
+  });
+
+const Cut kNuContained([](const caf::SRSliceProxy* slc) -> double {
+    if (slc->nuid.crlongtrkdiry > -0.2 && kHasNu(slc) && kLongestTrackLength(slc) > 100 && kmuon_contained(slc)) {
+      return true;
+    } else {
+      return false;
+    }
+  });
+
+const Cut kNoNuContained([](const caf::SRSliceProxy* slc) -> double {
+    if (slc->nuid.crlongtrkdiry > -0.2 && !kHasNu(slc) && kLongestTrackLength(slc)> 100 && kmuon_contained(slc)) {
+      return true;
+    } else {
+      return false;
+    }
+  });
+
+const Cut kDiryNu([](const caf::SRSliceProxy* slc) -> double {
+    if (slc->nuid.crlongtrkdiry > -0.2 && kHasNu(slc)) {
+      return true;
+    } else {
+      return false;
+    }
+  });
+
+const Cut kDiryNoNu([](const caf::SRSliceProxy* slc) -> double {
+    if (slc->nuid.crlongtrkdiry > -0.2 && !kHasNu(slc)) {
+      return true;
+    } else {
+      return false;
+    }
+  });
+
+const Cut kTkl([](const caf::SRSliceProxy* slc) -> double {
+    if (kLongestTrackLength(slc) > 100) {
+      return true;
+    } else {
+      return false;
+    }
+  });
+
+const Cut kSlcTrkDiryTklMuCont([](const caf::SRSliceProxy* slc) -> double {
+    if (slc->nuid.crlongtrkdiry > -0.2 && kLongestTrackLength(slc) > 15 && /*kmuon_contained(slc)*/ kRFiducial(slc)) {
+      return true;
+    } else {
+      return false;
+    }
+  });
+
+void smallerMC(){
+  const std::string fMC_majority_old = "/pnfs/sbn/data/sbn_fd/poms_production/2023A_ICARUS_NuMI_MC_Nu_Phase1/pretuned_signal_shape/mc/reconstructed/icaruscode_v09_72_00_03/flatcaf/[0]*/[2,3,4]*/detsim*.flat.caf*.root";
+  const std::string fdirt_mc_old = "/pnfs/sbn/data/sbn_fd/poms_production/2023A_ICARUS_NuMI_MC_dirt_plus_cosmics/pretuned_signal_shape/mc/reconstructed/icaruscode_v09_72_00_03/flatcaf/[0]*/[2,3,4]*/detsim*.flat.caf*.root";
+  const std::string fdata_majority_old = "/pnfs/icarus/scratch/users/gputnam/DMCP2023G/majority-3t1p/57386892_[2,3,4,5][0,1,3]*/data*Prescaled*.root";
+  const std::string fdirt_mc = "/pnfs/icarus/scratch/users/aheggest/crt/mc/NuMI_dirt_plus_cosmics/v09_75_01/caf/out/detsim_crtpmt_109files_mergedflat.caf.root"; // dirt MC
+  // Source of events
+  SpectrumLoader loader_nus(fdirt_mc_old);
+  //SpectrumLoader loader_intime(fMC_intimecosmic);
+  SpectrumLoader loader_maj(fMC_majority_old);
+  SpectrumLoader loader_cos(fdata_majority_old);
+
+  Spectrum scos_cos (loader_cos,     axcos,   kNoCut);
+
+  Spectrum dedx_all  (loader_cos, axdedx, OpFlash_cut, kSlcTrkDiryTkl);
+  Spectrum dedx_allMC (loader_maj, axdedx, OpFlash_MC, kSlcTrkDiryTkl);
+  Spectrum dedx_allNoSpillCut  (loader_cos, axdedx, kNoSpillCut, kSlcTrkDiryTkl); //no spill cut
+  //loader, asse, spillcut, slicecut
+  Spectrum dedx_allMCNoSpillCut (loader_maj, axdedx, kSlcTrkDiryTkl);
+  Spectrum dedx_rockMC (loader_nus, axdedx, OpFlash_MC, kSlcTrkDiryTkl);
+  Spectrum dedx_rockMC_nc (loader_nus, axdedx, OpFlash_MC, kSlcTrkDiryTklMuCont /*kSlcTrkDiryTkl*/);
+  Spectrum dedx_allMC_nc (loader_maj, axdedx, OpFlash_MC, kSlcTrkDiryTklMuCont /*kSlcTrkDiryTkl*/);
+
+  double POT = dedx_all.POT(); //2.7E12;//6.0E20; //NuMI
+
+  loader_nus.Go();
+  loader_maj.Go();
+  loader_cos.Go();
+
+  TH1* hdedx_all    = dedx_all.ToTH1(dedx_all.POT(), kBlack);
+  TH1* hdedx_allMC  = dedx_allMC.ToTH1(dedx_all.POT(), kBlue);
+  //TH1* hdedx_allMC  = dedx_allMC.ToTH1(dedx_all.POT(), kBlue);
+  TH1* hdedx_allNoSpillCut = dedx_allNoSpillCut.ToTH1(dedx_all.POT(), kRed); //no spill cut
+  TH1* hdedx_allMCNoSpillCut = dedx_allMCNoSpillCut.ToTH1(dedx_all.POT(), kGreen);
+  ////sOpFlashTime[Nus,Maj,Cos]+eventually CUT
+  TH1* hdedx_rockMC = dedx_rockMC.ToTH1(dedx_all.POT(), kRed);
+  TH1* hdedx_rockMC_nc = dedx_rockMC_nc.ToTH1(dedx_all.POT(), kBlack);
+  TH1* hdedx_allMC_nc  = dedx_allMC_nc.ToTH1(dedx_all.POT(), kGreen);
+  
+
+  TLegend *legMCRockvsAll = new TLegend(0.5, 0.65, 0.9, 0.9, NULL,"brNDC");
+  legMCRockvsAll-> SetFillStyle(0);
+  legMCRockvsAll -> SetTextSize(0.05);
+  legMCRockvsAll ->SetBorderSize(0);
+  legMCRockvsAll ->AddEntry(hdedx_allMC,  "All MC","l");
+  legMCRockvsAll ->AddEntry(hdedx_rockMC, "Rock MC","l");
+  legMCRockvsAll ->AddEntry(hdedx_allMC_nc,  "All MC + Fid","l");
+  legMCRockvsAll ->AddEntry(hdedx_rockMC_nc, "Rock MC + Fid","l");
+
+
+  hdedx_allNoSpillCut ->SetTitle("Maximum dE/dx of track");
+  hdedx_allNoSpillCut -> GetXaxis() -> SetTitle("dE/dX (MeV/cm)");
+
+  hdedx_rockMC -> SetTitle("");
+  //hdedx_rockMC -> GetYaxis() -> SetTitle("Track Length (cm)");
+  hdedx_rockMC -> GetXaxis() -> SetTitle("dE/dx (MeV/cm)");
+  hdedx_rockMC -> GetYaxis() -> CenterTitle();
+  hdedx_rockMC -> GetXaxis() -> CenterTitle();
+
+  hdedx_allMC -> SetTitle("");
+  //hdedx_rockMC -> GetYaxis() -> SetTitle("Track Length (cm)");
+  hdedx_allMC -> GetXaxis() -> SetTitle("dE/dx (MeV/cm)");
+  hdedx_allMC -> GetYaxis() -> CenterTitle();
+  hdedx_allMC -> GetXaxis() -> CenterTitle();
+
+
+  TCanvas* cdedx = new TCanvas("cdedx", "");
+  hdedx_allNoSpillCut->Draw("histo");
+  hdedx_allMC->Draw("hist same");
+  hdedx_all->Draw("hist same");
+  hdedx_allMCNoSpillCut->Draw("hist same");
+  //leg11->Draw("same");
+  cdedx -> Print("dedx.pdf");
+
+  TCanvas* cdedxRockvsAllMC = new TCanvas("dEdxMC", "");
+  hdedx_allMC->Draw("histo");
+  hdedx_rockMC->Draw("hist same");
+  hdedx_allMC_nc->Draw("hist same");
+  hdedx_rockMC_nc->Draw("hist same");
+  legMCRockvsAll->Draw("same");
+  cdedxRockvsAllMC -> Print("dedxRockvsAllMC.pdf");
+}

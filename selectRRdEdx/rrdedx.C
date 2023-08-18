@@ -1,0 +1,305 @@
+#pragma once
+
+#include "sbnana/CAFAna/Core/SpectrumLoader.h"
+#include "sbnana/CAFAna/Core/Spectrum.h"
+
+//#include "/icarus/app/users/mcaporal/selectRockSpill/selectRockAll/helper_numuCCSelCuts.h"//"helper_numuCCInclusiveSel.h"
+
+#include "thisCuts.h"
+
+#include "TCanvas.h"
+#include "TFile.h"
+#include "TTreeReader.h"
+#include "TH1.h"
+#include "TH2.h"
+#include "TLegend.h"
+#include "TPaveText.h"
+#include "TStyle.h"
+#include "TProfile.h"
+
+#include <iostream>
+#include <fstream>
+
+using namespace ana;
+
+void rrdedx(){
+
+  //  std::ofstream outputFile("output.txt");
+  //std::streambuf* originalStdout = std::cout.rdbuf();
+  //std::cout.rdbuf(outputFile.rdbuf());
+ 
+      const std::string fMC_majority_old = "/pnfs/sbn/data/sbn_fd/poms_production/2023A_ICARUS_NuMI_MC_Nu_Phase1/pretuned_signal_shape/mc/reconstructed/icaruscode_v09_72_00_03/flatcaf/[0,1,2]*/[2,3,4,5]*/detsim*.flat.caf*.root";
+   const std::string fdirt_mc_old = "/pnfs/sbn/data/sbn_fd/poms_production/2023A_ICARUS_NuMI_MC_dirt_plus_cosmics/pretuned_signal_shape/mc/reconstructed/icaruscode_v09_72_00_03/flatcaf/[0,1,2,3]*/*/detsim*.flat.caf*.root";
+  // const std::string fdata_majority_old = "/pnfs/icarus/scratch/users/gputnam/DMCP2023G/majority-3t1p/57386892_[2,3][0,1]*/data*Prescaled*.root";
+
+  //    const std::string fMC_majority_old = "/pnfs/sbn/data/sbn_fd/poms_production/2023A_ICARUS_NuMI_MC_Nu_Phase1/pretuned_signal_shape/mc/reconstructed/icaruscode_v09_72_00_03/flatcaf/*/*/detsim*.flat.caf*.root";
+  // const std::string fdirt_mc_old = "/pnfs/sbn/data/sbn_fd/poms_production/2023A_ICARUS_NuMI_MC_dirt_plus_cosmics/pretuned_signal_shape/mc/reconstructed/icaruscode_v09_72_00_03/flatcaf/*/*/detsim*.flat.caf*.root";
+    const std::string fdata_majority_old = "/pnfs/icarus/scratch/users/gputnam/DMCP2023G/majority-3t1p/57386892_*/data*Prescaled*.root";
+
+
+  SpectrumLoader loader_allMC(fMC_majority_old);
+  SpectrumLoader loader_rockMC(fdirt_mc_old);
+  SpectrumLoader loader_data(fdata_majority_old);
+
+  double POT = 6.0E20;
+
+  //Spectrum sdedx_allMC (loader_allMC, , OpFlash_MC, kSlcTrkDiryTkl);
+
+  Spectrum sdedx_allMC ("sdedx_allMC", dedxBinning, loader_allMC, kdEdx, OpFlash_MC,  kSlcTrkDiryTkl);
+  
+  Spectrum sResRange_allMC ("sResRange_allMC", kResRangeBinning, loader_allMC, kResiRange, OpFlash_MC,  kSlcTrkDiryTkl);
+
+  Spectrum sRRdEdx_allMC ("dEdxResidualRange", loader_allMC, kResRangeBinning, kResiRange, dedxBinning, kdEdx, OpFlash_MC, kSlcTrkDiryTkl && kRFiducial && kPTrackContained); //add trackcontained e fiducial(?)
+ Spectrum sRRdEdx_rockMC ("dEdxResidualRange", loader_rockMC, kResRangeBinning, kResiRange, dedxBinning, kdEdx, OpFlash_MC, kSlcTrkDiryTkl && kRFiducial && kPTrackContained); //add trackcontained e fiducial(?)
+ //Spectrum sRRdEdx_data ("dEdxResidualRange", loader_data, kResRangeBinning, kResiRange, dedxBinning, kdEdx, kNoSpillCut, kSlcTrkDiryTkl && kRFiducial);
+ Spectrum sRRdEdx_data ("dEdxResidualRange", loader_data, kResRangeBinning, kResiRange, dedxBinning, kdEdx, /*kNoSpillCut*/OpFlash_cutTime, kSlcTrkDiryTkl && kRFiducial && kPTrackContained);
+ Spectrum sRRdEdx_dataRef ("dEdxResidualRange", loader_data, kResRangeBinning, kResiRange, dedxBinning, kdEdx, kNoSpillCut, kNoCut); 
+
+ Spectrum sdedxMax_allMC  (loader_allMC, axdedx, OpFlash_MC, kSlcTrkDiryTkl && kRFiducial && kPTrackContained);
+ Spectrum sdedxMax_rockMC  (loader_rockMC, axdedx, OpFlash_MC, kSlcTrkDiryTkl && kRFiducial && kPTrackContained);
+ Spectrum sdedxMax_data  (loader_data, axdedx, OpFlash_cutTime, kSlcTrkDiryTkl && kRFiducial && kPTrackContained);
+ Spectrum sdedxMax_rockMCRes  (loader_rockMC, axdedxRestricted, OpFlash_MC, kSlcTrkDiryTkl && kRFiducial && kPTrackContained);
+ Spectrum sdedxMax_dataRes  (loader_data, axdedxRestricted, OpFlash_cutTime, kSlcTrkDiryTkl && kRFiducial && kPTrackContained);
+
+
+  loader_allMC.Go();
+  loader_rockMC.Go();
+  loader_data.Go();
+
+  sRRdEdx_allMC.OverridePOT(1);
+  sRRdEdx_rockMC.OverridePOT(1);
+  sRRdEdx_data.OverridePOT(1);
+  sRRdEdx_dataRef.OverridePOT(1);
+  
+  sdedxMax_allMC.OverridePOT(1);
+  sdedxMax_rockMC.OverridePOT(1);
+  sdedxMax_data.OverridePOT(1);
+  sdedxMax_rockMCRes.OverridePOT(1);
+  sdedxMax_dataRes.OverridePOT(1);
+  
+
+  TH2* hRRdEdx_allMC = sRRdEdx_allMC.ToTH2(POT);
+  TH2* hRRdEdx_rockMC = sRRdEdx_rockMC.ToTH2(POT);
+  TH2* hRRdEdx_data = sRRdEdx_data.ToTH2(POT);
+  TH2* hRRdEdx_dataRef = sRRdEdx_dataRef.ToTH2(POT);
+
+  TH1* hdedxMax_allMC = sdedxMax_allMC.ToTH1(POT);
+  TH1* hdedxMax_rockMC = sdedxMax_rockMC.ToTH1(POT);
+  TH1* hdedxMax_data = sdedxMax_data.ToTH1(POT);
+  TH1* hdedxMax_rockMCRes = sdedxMax_rockMCRes.ToTH1(POT);
+  TH1* hdedxMax_dataRes = sdedxMax_dataRes.ToTH1(POT);
+
+  hRRdEdx_allMC->SetTitle("All MC(TrackDiryTkl+Fid/Cont+OP1stFlash);Residual Range (cm);dE/dx (MeV/cm)");
+  hRRdEdx_rockMC->SetTitle("Rock MC(TrackDiryTkl+Fid/Cont+OP1stFlash);Residual Range (cm);dE/dx (MeV/cm)");
+  hRRdEdx_data->SetTitle("Data(TrackDiryTkl+Fid/Cont+OPFlash);Residual Range (cm);dE/dx (MeV/cm)");
+  hRRdEdx_dataRef->SetTitle("Data(NoCut);Residual Range (cm);dE/dx (MeV/cm)");
+//axX_allMC->SetTitle("Residual Range (cm)");
+  hdedxMax_allMC->SetTitle("MaxdEdxAllMC(Diry+fid/cont+1stFlash);dE/dx (MeV/cm); Events");
+  hdedxMax_rockMC->SetTitle("MaxdEdxRockMC(Diry+fid/cont+1stFlash);dE/dx (MeV/cm); Events");
+  hdedxMax_data->SetTitle("MaxdEdxData(Diry+fid/cont+FlashTime);dE/dx (MeV/cm); Events");
+  hdedxMax_rockMCRes->SetTitle("MaxdEdxRockMC(Diry+fid/cont+1stFlash);dE/dx (MeV/cm); Events");
+  hdedxMax_dataRes->SetTitle("MaxdEdxData(Diry+fid/cont+FlashTime);dE/dx (MeV/cm); Events");
+  
+  //TCanvas *c1 = new TCanvas("c1","c1");
+  //hdedxMax_allMC->Draw();
+  //c1->Print("c1.pdf");
+
+  TCanvas *cRRdEdx_all = new TCanvas("cRRdEdx_all","cRRdEdx_all"/*,1800,1200*/);
+  cRRdEdx_all->Divide(2,2);
+  cRRdEdx_all->cd(1);
+  hRRdEdx_allMC->Draw("colz");
+  cRRdEdx_all->cd(2);
+  hRRdEdx_rockMC->Draw("colz");
+  cRRdEdx_all->cd(3);
+  hRRdEdx_data->Draw("colz");
+  cRRdEdx_all->cd(4);
+  hRRdEdx_dataRef->Draw("colz");
+  cRRdEdx_all->Print("Outrrdedx/rrdedx.pdf");
+
+  //Projections
+  //allMC
+  TCanvas *cRRdEdx_allallMC = new TCanvas("cRRdEdx_allallMC","cRRdEdx_allallMC"/*,1800,1200*/);
+  cRRdEdx_allallMC->Divide(2,2);
+  cRRdEdx_allallMC->cd(2);
+  hRRdEdx_allMC->Draw("colz");
+  cRRdEdx_allallMC->cd(1);
+  auto *hRRdEdx_allMCX = hRRdEdx_allMC->ProjectionX();
+  hRRdEdx_allMCX->Draw("histo");
+  cRRdEdx_allallMC->cd(3);
+  auto *hRRdEdx_allMCY = hRRdEdx_allMC->ProjectionY();
+  hRRdEdx_allMCY->Draw("histo");
+  cRRdEdx_allallMC->Print("Outrrdedx/ProjectionAllMC.pdf");
+  
+  //rockMC
+  TCanvas *cRRdEdx_allrockMC = new TCanvas("cRRdEdx_allrockMC","cRRdEdx_allrockMC"/*,1800,1200*/);
+  cRRdEdx_allrockMC->Divide(2,2);
+  cRRdEdx_allrockMC->cd(2);
+  hRRdEdx_rockMC->Draw("colz");
+  cRRdEdx_allrockMC->cd(1);
+  auto *hRRdEdx_rockMCX = hRRdEdx_rockMC->ProjectionX();
+  hRRdEdx_rockMCX->Draw("histo");
+  cRRdEdx_allrockMC->cd(3);
+  auto *hRRdEdx_rockMCY = hRRdEdx_rockMC->ProjectionY();
+  hRRdEdx_rockMCY->Draw("histo");
+  cRRdEdx_allrockMC->Print("Outrrdedx/ProjectionRockMC.pdf");
+  
+  //data
+  TCanvas *cRRdEdx_alldata = new TCanvas("cRRdEdx_alldata","cRRdEdx_alldata"/*,1800,1200*/);
+  cRRdEdx_alldata->Divide(2,2);
+  cRRdEdx_alldata->cd(2);
+  hRRdEdx_data->Draw("colz");
+  cRRdEdx_alldata->cd(1);
+  auto *hRRdEdx_dataX = hRRdEdx_data->ProjectionX();
+  hRRdEdx_dataX->Draw("histo");
+  cRRdEdx_alldata->cd(3);
+  auto *hRRdEdx_dataY = hRRdEdx_data->ProjectionY();
+  hRRdEdx_dataY->Draw("histo");
+  cRRdEdx_alldata->Print("Outrrdedx/ProjectionData.pdf");
+
+
+  //hRRdEdx_data auto *hRRdEdx_dataX = hRRdEdx_data->ProjectionX();
+  //auto *hRRdEdx_dataX = hRRdEdx_data->ProjectionX();
+  //auto *hRRdEdx_dataY = hRRdEdx_data->ProjectionY();
+  hRRdEdx_dataX ->SetLineColor(kBlue);
+  hRRdEdx_dataY ->SetLineColor(kBlue);
+
+  TCanvas *cComparisonRRdedx = new TCanvas("cComparisonRRdedx","cComparisonRRdedx");
+  cComparisonRRdedx->Divide(1,2);
+  cComparisonRRdedx->cd(1);
+  hRRdEdx_allMCX->SetTitle("");
+  hRRdEdx_allMCX->Draw("histo");
+  hRRdEdx_rockMCX->SetLineColor(kRed);
+  hRRdEdx_rockMCX->Draw("hist same");
+  hRRdEdx_dataX->Draw("hist same");
+  cComparisonRRdedx->cd(2);
+  hRRdEdx_allMCY->SetTitle("");
+  hRRdEdx_allMCY->Draw("histo");
+  hRRdEdx_rockMCY->SetLineColor(kRed);
+  hRRdEdx_rockMCY->Draw("hist same");
+  hRRdEdx_dataY->Draw("hist same");
+  TLegend *legComparison = new TLegend(0.7, 0.7, 0.9, 0.9);
+  legComparison->AddEntry(hRRdEdx_allMCY, "All Mc", "l");
+  legComparison->AddEntry(hRRdEdx_rockMCY, "Rock Mc", "l");
+  legComparison->AddEntry(hRRdEdx_dataY, "Data", "l");
+  legComparison->Draw();
+  cComparisonRRdedx->Print("Outrrdedx/Projections.pdf");
+
+  //Profiles
+  //allMC
+  TCanvas *cRRdEdx_allallMCProfiles = new TCanvas("cRRdEdx_allallMCProfiles","cRRdEdx_allallMCProfiles"/*,1800,1200*/);
+  cRRdEdx_allallMCProfiles->Divide(2,2);
+  cRRdEdx_allallMCProfiles->cd(2);
+  hRRdEdx_allMC->Draw("colz");
+  cRRdEdx_allallMCProfiles->cd(1);
+  auto *hRRdEdx_allMCXProf = hRRdEdx_allMC->ProfileX();
+  //hRRdEdx_allMCXProf->GetYaxis() -> SetRangeUser(1.,2.7);
+  //hRRdEdx_allMCXProf -> SetLineColor(kRed);
+  hRRdEdx_allMCXProf->Draw();
+  cRRdEdx_allallMCProfiles->cd(3);
+  auto *hRRdEdx_allMCYProf = hRRdEdx_allMC->ProfileY();
+  hRRdEdx_allMCYProf->Draw();
+  cRRdEdx_allallMCProfiles->Print("Outrrdedx/ProfileAllMC.pdf");
+
+  //rockMC
+  TCanvas *cRRdEdx_allrockMCProfiles = new TCanvas("cRRdEdx_allrockMCProf","cRRdEdx_allrockMCProf"/*,1800,1200*/);
+  cRRdEdx_allrockMCProfiles->Divide(2,2);
+  cRRdEdx_allrockMCProfiles->cd(2);
+  hRRdEdx_rockMC->Draw("colz");
+  cRRdEdx_allrockMCProfiles->cd(1);
+  auto *hRRdEdx_rockMCXProf = hRRdEdx_rockMC->ProfileX();
+  hRRdEdx_rockMCXProf->Draw();
+  cRRdEdx_allrockMCProfiles->cd(3);
+  auto *hRRdEdx_rockMCYProf = hRRdEdx_rockMC->ProfileY();
+  hRRdEdx_rockMCYProf->Draw();
+  cRRdEdx_allrockMCProfiles->Print("Outrrdedx/ProfileRockMC.pdf");
+  
+  //data
+  TCanvas *cRRdEdx_alldataProfiles = new TCanvas("cRRdEdx_alldataProf","cRRdEdx_alldataProf"/*,1800,1200*/);
+  cRRdEdx_alldataProfiles->Divide(2,2);
+  cRRdEdx_alldataProfiles->cd(2);
+  hRRdEdx_data->Draw("colz");
+  cRRdEdx_alldataProfiles->cd(1);
+  auto *hRRdEdx_dataXProf = hRRdEdx_data->ProfileX();
+  hRRdEdx_dataXProf->Draw();
+  cRRdEdx_alldataProfiles->cd(3);
+  auto *hRRdEdx_dataYProf = hRRdEdx_data->ProfileY();
+  hRRdEdx_dataYProf->Draw();
+  cRRdEdx_alldataProfiles->Print("Outrrdedx/ProfileData.pdf");
+
+
+  //hRRdEdx_data auto *hRRdEdx_dataX = hRRdEdx_data->ProjectionX();
+  //auto *hRRdEdx_dataX = hRRdEdx_data->ProjectionX();
+  //auto *hRRdEdx_dataY = hRRdEdx_data->ProjectionY();
+  hRRdEdx_dataXProf ->SetLineColor(kBlue);
+  hRRdEdx_dataYProf ->SetLineColor(kBlue);
+
+  TCanvas *cComparisonRRdedxProf = new TCanvas("cComparisonRRdedxProf","cComparisonRRdedxProf");
+  cComparisonRRdedxProf->Divide(1,2);
+  cComparisonRRdedxProf->cd(1);
+  hRRdEdx_allMCXProf->SetTitle("");
+  hRRdEdx_allMCXProf->Draw();
+  hRRdEdx_rockMCXProf->SetLineColor(kRed);
+  hRRdEdx_rockMCXProf->Draw("same");
+  hRRdEdx_dataXProf->Draw("same");
+  cComparisonRRdedxProf->cd(2);
+  hRRdEdx_allMCYProf->SetTitle("");
+  hRRdEdx_allMCYProf->Draw();
+  hRRdEdx_rockMCYProf->SetLineColor(kRed);
+  hRRdEdx_rockMCYProf->Draw("same");
+  hRRdEdx_dataYProf->Draw("same");
+  TLegend *legComparisonProf = new TLegend(0.7, 0.7, 0.9, 0.9);
+  legComparisonProf->AddEntry(hRRdEdx_allMCYProf, "All Mc", "l");
+  legComparisonProf->AddEntry(hRRdEdx_rockMCYProf, "Rock Mc", "l");
+  legComparisonProf->AddEntry(hRRdEdx_dataYProf, "Data", "l");
+  legComparisonProf->Draw();
+  cComparisonRRdedxProf->Print("Outrrdedx/Profiles.pdf");
+
+  TCanvas *cdedxMax = new TCanvas("cdedxMax","cdedxMax");
+  cdedxMax->Divide(2,2);
+  cdedxMax->cd(1);
+  hdedxMax_allMC->Draw();
+  cdedxMax->cd(2);
+  hdedxMax_rockMC->Draw();
+  cdedxMax->cd(3);
+  hdedxMax_data->Draw();
+  cdedxMax->cd(4);
+  hdedxMax_data->SetLineColor(kBlue);
+  hdedxMax_rockMC->SetLineColor(kRed);
+  hdedxMax_allMC->Draw();
+  hdedxMax_rockMC->Draw("same");
+  hdedxMax_data->Draw("same");
+  TLegend *legdedxMax = new TLegend(0.7, 0.7, 0.9, 0.9);
+  legdedxMax->AddEntry(hdedxMax_allMC, "All Mc", "l");
+  legdedxMax->AddEntry(hdedxMax_rockMC, "Rock Mc", "l");
+  legdedxMax->AddEntry(hdedxMax_data, "Data", "l");
+  legdedxMax->Draw();
+  cdedxMax->Print("Outrrdedx/cdedxMax.pdf");
+  
+  TCanvas *cdedxMaxRes = new TCanvas("cdedxMaxRes","cdedxMaxRes");
+  hdedxMax_rockMCRes->SetLineColor(kRed);
+  hdedxMax_dataRes->SetLineColor(kBlue);
+  //hdedxMax_rockMCRes->SetFillColor(kRed);
+  hdedxMax_dataRes->SetFillColor(kBlue);
+  TLegend *legdedxMaxRes = new TLegend(0.7, 0.7, 0.9, 0.9);
+  legdedxMaxRes->AddEntry(hdedxMax_rockMCRes, "Rock Mc", "l");
+  legdedxMaxRes->AddEntry(hdedxMax_dataRes, "Data", "l");
+  hdedxMax_rockMCRes->SetMaximum(1.3*hdedxMax_rockMCRes->GetMaximum());
+  hdedxMax_rockMCRes->Draw("histo");
+  hdedxMax_dataRes->Draw("hist same");
+  legdedxMaxRes->Draw();
+  cdedxMaxRes->Print("Outrrdedx/cdedxMaxRes.pdf");
+
+  TFile f("Outrrdedx/histos.root", "RECREATE");
+  hRRdEdx_allMC -> Write("hRRdEdx_allMC");
+  hRRdEdx_rockMC -> Write("hRRdEdx_rockMC");
+  hRRdEdx_data  -> Write("hRRdEdx_data");
+  hRRdEdx_dataRef  -> Write("hRRdEdx_dataRef");
+
+  hdedxMax_allMC -> Write("hdedxMax_allMC");
+  hdedxMax_rockMC -> Write("hdedxMax_rockMC");
+  hdedxMax_data -> Write("hdedxMax_data");
+  hdedxMax_rockMCRes -> Write("hdedxMax_rockMCRes");
+  hdedxMax_dataRes -> Write("hdedxMax_dataRes");
+  
+  std::cout << "the end\n";
+}

@@ -1,0 +1,13 @@
+FILE = version
+PRODUCT = sbnana
+VERSION = v09_73_03
+
+FLAVOR = Linux64bit+3.10-2.17
+QUALIFIERS = e20:prof
+  DECLARER = cetmodules 3.21.01
+  DECLARED = Tue Aug 01 10:44:35 CDT 2023
+  MODIFIER = cetmodules 3.21.01
+  MODIFIED = Tue Aug 01 10:44:35 CDT 2023
+  PROD_DIR = sbnana/v09_73_03
+  UPS_DIR = slf7.x86_64.e20.prof/ups
+  TABLE_FILE = sbnana.table

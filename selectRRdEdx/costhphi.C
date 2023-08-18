@@ -1,0 +1,206 @@
+#pragma once
+
+#include "sbnana/CAFAna/Core/SpectrumLoader.h"
+#include "sbnana/CAFAna/Core/Spectrum.h"
+
+#include "thisCuts.h"
+
+#include "TCanvas.h"
+#include "TFile.h"
+#include "TTreeReader.h"
+#include "TH1.h"
+#include "TH2.h"
+#include "TLegend.h"
+#include "TPaveText.h"
+#include "TStyle.h"
+#include "TProfile.h"
+
+#include <iostream>
+#include <fstream>
+
+using namespace ana;
+
+void costhphi(){
+
+  //  std::ofstream outputFile("output.txt");
+  //std::streambuf* originalStdout = std::cout.rdbuf();
+  //std::cout.rdbuf(outputFile.rdbuf());
+ 
+    const std::string fMC_majority_old = "/pnfs/sbn/data/sbn_fd/poms_production/2023A_ICARUS_NuMI_MC_Nu_Phase1/pretuned_signal_shape/mc/reconstructed/icaruscode_v09_72_00_03/flatcaf/[0,1]*/[2,3,4]*/detsim*.flat.caf*.root";
+   const std::string fdirt_mc_old = "/pnfs/sbn/data/sbn_fd/poms_production/2023A_ICARUS_NuMI_MC_dirt_plus_cosmics/pretuned_signal_shape/mc/reconstructed/icaruscode_v09_72_00_03/flatcaf/[0,1,2,3,]*/[0,1,2,3,4,5,6]*/detsim*.flat.caf*.root";
+   const std::string fdata_majority_old = "/pnfs/icarus/scratch/users/gputnam/DMCP2023G/majority-3t1p/*/data*Prescaled*.root";
+
+  SpectrumLoader loader_allMC(fMC_majority_old);
+  SpectrumLoader loader_rockMC(fdirt_mc_old);
+  SpectrumLoader loader_data(fdata_majority_old);
+
+  double POT = 6.0E20;
+  Spectrum sCosTheta_allMC (loader_allMC, axCosTheta, OpFlash_MC, kSlcTrkDiryTkl && kRFiducial && kPTrackContained);
+  Spectrum sCosTheta_rockMC (loader_rockMC, axCosTheta, OpFlash_MC, kSlcTrkDiryTkl && kRFiducial && kPTrackContained);
+  Spectrum sCosTheta_data (loader_rockMC, axCosTheta, OpFlash_cutTime, kSlcTrkDiryTkl && kRFiducial && kPTrackContained);
+
+
+  Spectrum sCosPhi_allMC (loader_allMC, axCosPhi, OpFlash_MC, kSlcTrkDiryTkl && kRFiducial && kPTrackContained);
+  Spectrum sCosPhi_rockMC (loader_rockMC, axCosPhi, OpFlash_MC, kSlcTrkDiryTkl && kRFiducial && kPTrackContained);
+  Spectrum sCosPhi_data (loader_rockMC, axCosPhi, OpFlash_cutTime, kSlcTrkDiryTkl && kRFiducial && kPTrackContained);
+
+  Spectrum sCosTheta_allMCnocut (loader_allMC, axCosTheta,  kSlcTrkDiryTkl/*OpFlash_MC, kSlcTrkDiryTkl && kRFiducial && kPTrackContained*/);
+  Spectrum sCosTheta_rockMCnocut (loader_rockMC, axCosTheta, kSlcTrkDiryTkl /* OpFlash_MC, kSlcTrkDiryTkl && kRFiducial && kPTrackContained*/);
+  Spectrum sCosTheta_datanocut (loader_rockMC, axCosTheta,  kSlcTrkDiryTkl /*OpFlash_cutTime, kSlcTrkDiryTkl && kRFiducial && kPTrackContained*/);
+
+  Spectrum sCosPhi_allMCnocut (loader_allMC, axCosPhi,  kSlcTrkDiryTkl /* OpFlash_MC, kSlcTrkDiryTkl && kRFiducial && kPTrackContained*/);
+  Spectrum sCosPhi_rockMCnocut (loader_rockMC, axCosPhi, kSlcTrkDiryTkl /* OpFlash_MC, kSlcTrkDiryTkl && kRFiducial && kPTrackContained*/);
+  Spectrum sCosPhi_datanocut (loader_rockMC, axCosPhi,  kSlcTrkDiryTkl /* OpFlash_cutTime, kSlcTrkDiryTkl && kRFiducial && kPTrackContained*/);
+
+
+  // Spectrum scos_cos_diry (loader_cos,     axcos,   kNoSpillCut, kSlcTrkDiry);
+  //const HistAxis axCosTheta ("axCosTheta", kCosThetaBinning, kTrkCostheta); ////kCosThetaBinning,kCosPhiBinning
+  //  const HistAxis axCosPhi ("axCosPhi", kCosPhiBinning, kTrkCosphi);
+  //Spectrum sdedx_allMC ("sdedx_allMC", dedxBinning, loader_allMC, kdEdx, OpFlash_MC,  kSlcTrkDiryTkl);
+  
+  //Spectrum sResRange_allMC ("sResRange_allMC", kResRangeBinning, loader_allMC, kResiRange, OpFlash_MC,  kSlcTrkDiryTkl);
+
+  //Spectrum sRRdEdx_allMC ("dEdxResidualRange", loader_allMC, kResRangeBinning, kResiRange, dedxBinning, kdEdx, OpFlash_MC, kSlcTrkDiryTkl && kRFiducial && kPTrackContained); //add trackcontained e fiducial(?)
+  //Spectrum sRRdEdx_rockMC ("dEdxResidualRange", loader_rockMC, kResRangeBinning, kResiRange, dedxBinning, kdEdx, OpFlash_MC, kSlcTrkDiryTkl && kRFiducial && kPTrackContained); //add trackcontained e fiducial(?)
+ //Spectrum sRRdEdx_data ("dEdxResidualRange", loader_data, kResRangeBinning, kResiRange, dedxBinning, kdEdx, kNoSpillCut, kSlcTrkDi
+  loader_allMC.Go();
+  loader_rockMC.Go();
+  loader_data.Go();
+  
+  sCosTheta_allMC.OverridePOT(1);
+  sCosTheta_rockMC.OverridePOT(1);
+  sCosTheta_data.OverridePOT(1);
+  sCosPhi_allMC.OverridePOT(1);
+  sCosPhi_rockMC.OverridePOT(1);
+  sCosPhi_data.OverridePOT(1);
+
+  sCosTheta_allMCnocut.OverridePOT(1);
+  sCosTheta_rockMCnocut.OverridePOT(1);
+  sCosTheta_datanocut.OverridePOT(1);
+  sCosPhi_allMCnocut.OverridePOT(1);
+  sCosPhi_rockMCnocut.OverridePOT(1);
+  sCosPhi_datanocut.OverridePOT(1);
+
+  TH1* hCosTheta_allMC = sCosTheta_allMC.ToTH1(POT);
+  TH1* hCosTheta_rockMC = sCosTheta_rockMC.ToTH1(POT);
+  TH1* hCosTheta_data = sCosTheta_data.ToTH1(POT);
+  TH1* hCosPhi_allMC = sCosPhi_allMC.ToTH1(POT);
+  TH1* hCosPhi_rockMC = sCosPhi_rockMC.ToTH1(POT);
+  TH1* hCosPhi_data = sCosPhi_data.ToTH1(POT);
+
+  TH1* hCosTheta_allMCnocut = sCosTheta_allMCnocut.ToTH1(POT);
+  TH1* hCosTheta_rockMCnocut = sCosTheta_rockMCnocut.ToTH1(POT);
+  TH1* hCosTheta_datanocut = sCosTheta_datanocut.ToTH1(POT);
+  TH1* hCosPhi_allMCnocut = sCosPhi_allMCnocut.ToTH1(POT);
+  TH1* hCosPhi_rockMCnocut = sCosPhi_rockMCnocut.ToTH1(POT);
+  TH1* hCosPhi_datanocut = sCosPhi_datanocut.ToTH1(POT);
+
+  hCosTheta_allMC->SetTitle("AllMC(TrkDiry+Fid/Cont+OP1stFlash);Cos#theta;Events");
+  hCosTheta_rockMC->SetTitle("RockMC(TrkDiry+Fid/Cont+OP1stFlash);Cos#theta;Events");
+  hCosTheta_data->SetTitle("Data(TrkDiry+Fid/Cont+OPFlashTime);Cos#theta;Events");
+  hCosPhi_allMC->SetTitle("AllMC(TrkDiry+Fid/Cont+OP1stFlash);#phi;Events");
+  hCosPhi_rockMC->SetTitle("RockMC(TrkDiry+Fid/Cont+OP1stFlash);#phi;Events");
+  hCosPhi_data->SetTitle("Data(TrkDiry+Fid/Cont+OPFlashTime);#phi;Events");
+
+   hCosTheta_allMCnocut->SetTitle("AllMC(TrkDiry);Cos#theta;Events");
+  hCosTheta_rockMCnocut->SetTitle("RockMC(TrkDiry);Cos#theta;Events");
+  hCosTheta_datanocut->SetTitle("Data(TrkDiry);Cos#theta;Events");
+  hCosPhi_allMCnocut->SetTitle("AllMC(TrkDiry);#phi;Events");
+  hCosPhi_rockMCnocut->SetTitle("RockMC(TrkDiry);#phi;Events");
+  hCosPhi_datanocut->SetTitle("Data(TrkDiry);#phi;Events");
+
+  TCanvas *cosThetaCanvas = new TCanvas("cosThetaCanvas","cosThetaCanvas");
+  cosThetaCanvas->Divide(2,2);
+  cosThetaCanvas->cd(1);
+  hCosTheta_allMC->Draw();
+  cosThetaCanvas->cd(2);
+  hCosTheta_rockMC->Draw();
+  cosThetaCanvas->cd(3);
+  hCosTheta_data->Draw();
+  cosThetaCanvas->cd(4);
+  hCosTheta_allMC->Draw();
+  hCosTheta_rockMC->Draw("same");
+  hCosTheta_data->Draw("same");
+  TLegend *legCosTheta = new TLegend(0.15,0.7,0.35,0.9);
+  hCosTheta_rockMC->SetLineColor(kRed);
+  hCosTheta_data->SetLineColor(kBlue);
+  legCosTheta->AddEntry(hCosTheta_allMC, "AllMC", "l");
+  legCosTheta->AddEntry(hCosTheta_rockMC, "RockMC", "l");
+  legCosTheta->AddEntry(hCosTheta_data, "data", "l");
+  legCosTheta->Draw();
+  cosThetaCanvas->Print("Outcosthphi/cosTheta.pdf");
+
+  TCanvas *cosThetaCanvasnocut = new TCanvas("cosThetaCanvasnc","cosThetaCanvasnc");
+  cosThetaCanvasnocut->Divide(2,2);
+  cosThetaCanvasnocut->cd(1);
+  hCosTheta_allMCnocut->Draw();
+  cosThetaCanvasnocut->cd(2);
+  hCosTheta_rockMCnocut->Draw();
+  cosThetaCanvasnocut->cd(3);
+  hCosTheta_datanocut->Draw();
+  cosThetaCanvasnocut->cd(4);
+  hCosTheta_allMCnocut->Draw();
+  hCosTheta_rockMCnocut->Draw("same");
+  hCosTheta_datanocut->Draw("same");
+  TLegend *legCosThetanocut = new TLegend(0.15,0.7,0.35,0.9);
+  hCosTheta_rockMCnocut->SetLineColor(kRed);
+  hCosTheta_datanocut->SetLineColor(kBlue);
+  legCosThetanocut->AddEntry(hCosTheta_allMCnocut, "AllMC", "l");
+  legCosThetanocut->AddEntry(hCosTheta_rockMCnocut, "RockMC", "l");
+  legCosThetanocut->AddEntry(hCosTheta_datanocut, "data", "l");
+  legCosThetanocut->Draw();
+  cosThetaCanvasnocut->Print("Outcosthphi/cosThetanocut.pdf");
+
+  TCanvas *cosPhiCanvas = new TCanvas("cosPhiCanvas","cosPhiCanvas");
+  cosPhiCanvas->Divide(2,2);
+  cosPhiCanvas->cd(1);
+  hCosPhi_allMC->Draw();
+  cosPhiCanvas->cd(2);
+  hCosPhi_rockMC->Draw();
+  cosPhiCanvas->cd(3);
+  hCosPhi_data->Draw();
+  cosPhiCanvas->cd(4);
+  hCosPhi_allMC->Draw();
+  hCosPhi_rockMC->Draw("same");
+  hCosPhi_data->Draw("same");
+  TLegend *legCosPhi = new TLegend(0.15,0.7,0.35,0.9);
+  hCosPhi_rockMC->SetLineColor(kRed);
+  hCosPhi_data->SetLineColor(kBlue);
+  legCosPhi->AddEntry(hCosPhi_allMC, "AllMC", "l");
+  legCosPhi->AddEntry(hCosPhi_rockMC, "RockMC", "l");
+  legCosPhi->AddEntry(hCosPhi_data, "data", "l");
+  legCosPhi->Draw();
+  cosPhiCanvas->Print("Outcosthphi/cosPhi.pdf");
+
+  TCanvas *cosPhiCanvasnocut = new TCanvas("cosPhiCanvasnocut","cosPhiCanvasnocut");
+  cosPhiCanvasnocut->Divide(2,2);
+  cosPhiCanvasnocut->cd(1);
+  hCosPhi_allMCnocut->Draw();
+  cosPhiCanvasnocut->cd(2);
+  hCosPhi_rockMCnocut->Draw();
+  cosPhiCanvasnocut->cd(3);
+  hCosPhi_datanocut->Draw();
+  cosPhiCanvasnocut->cd(4);
+  hCosPhi_allMCnocut->Draw();
+  hCosPhi_rockMCnocut->Draw("same");
+  hCosPhi_datanocut->Draw("same");
+  TLegend *legCosPhinocut = new TLegend(0.15,0.7,0.35,0.9);
+  hCosPhi_rockMCnocut->SetLineColor(kRed);
+  hCosPhi_datanocut->SetLineColor(kBlue);
+  legCosPhinocut->AddEntry(hCosPhi_allMCnocut, "AllMC", "l");
+  legCosPhinocut->AddEntry(hCosPhi_rockMCnocut, "RockMC", "l");
+  legCosPhinocut->AddEntry(hCosPhi_datanocut, "data", "l");
+  legCosPhinocut->Draw();
+  cosPhiCanvasnocut->Print("Outcosthphi/cosPhinocut.pdf");
+
+  //hRRdEdx_allMC->SetTitle("All MC(TrackDiryTkl+Fid/Cont+OP1stFlash);Residual Range (cm);dE/dx (MeV/cm)");
+  //TCanvas *cRRdEdx_all = new TCanvas("cRRdEdx_all","cRRdEdx_all"/*,1800,1200*/);
+  //cRRdEdx_all->Divide(2,2);
+  //cRRdEdx_all->cd(1);
+  //  TLegend *legComparison = new TLegend(0.7, 0.7, 0.9, 0.9);
+  //legComparison->AddEntry(hRRdEdx_allMCY, "All Mc", "l");
+  //legComparison->Draw();
+  //cComparisonRRdedx->Print("Outrrdedx/Projections.pdf");
+  //output directory Outcosthphi/...
+  std::cout << "End of the code\n";
+}

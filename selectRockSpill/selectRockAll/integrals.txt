@@ -1,0 +1,79 @@
+
+Rock
+NoCut 161331
+OpFlash 28590.4
+Diry 273.942
+Track Length 18313
+
+Majority
+NoCut 33727
+OpFlash 26405
+Diry 276.629
+Track Length 4252.14
+
+data
+NoCut 54188
+OpFlash 0
+Diry 366
+Track Length 6373
+
+progression for data
+NoCut 54188
++OpFlash 0
++Diry 0
++TrackLength 321
+
+progression for Rock
+NoCut 161331
++OpFlash 28590.4
++Diry 273.942
++TrackLength 235.133
+
+progression for Majority
+NoCut 33727
++OpFlash 26405
++Diry 276.629
++TrackLength 253.389
+
+Neutrino vs Cosmics, pre Cut Rock
+Both 273.942
+cosmic 164.365
+neutrino 109.577
+
+Neutrino vs Cosmics, pre Cut Majority
+Both 276.629
+cosmic 38.2333
+neutrino 238.396
+
+Neutrino vs Cosmics, post Tkl Rock
+Both 235.133
+cosmic 82.1825
+neutrino 102.728
+
+Neutrino vs Cosmics, post Tkl Majority
+Both 253.389
+cosmic 26.2385
+neutrino 195.664
+
+Track Length comparison 
+data 12820
+all MC 8756.17
+Rock MC 37018.7
+
+Track Length comparison post cut
+data 584
+all MC 461.048
+Rock MC 570.712
+
+Costh comparison post cut
+data 321
+all MC 253.389
+Rock MC 235.133
+
+POT MC 2.51983e+17
+POT data 5.75238e+17
+POT maj 7.67319e+17
+
+data nocut 1549
+maj nocut 2070
+rock nocut 3270
